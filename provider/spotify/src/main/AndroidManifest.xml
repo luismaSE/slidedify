@@ -1,14 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <application>
-        <!-- Receives the OAuth redirect (slidedify://spotify-callback?code=...&state=...). -->
+        <!-- Starts the Spotify auth library and receives its result. -->
         <activity
-            android:name=".SpotifyAuthCallbackActivity"
+            android:name=".SpotifyLoginActivity"
+            android:exported="false"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+
+        <!--
+            Spotify auth library 5.x: its redirect receiver needs our redirect URI.
+            Must match SPOTIFY_REDIRECT_URI and the Redirect URI in the Developer Dashboard.
+        -->
+        <activity
+            android:name="com.spotify.sdk.android.auth.browser.RedirectUriReceiverActivity"
             android:exported="true"
-            android:launchMode="singleTask"
-            android:noHistory="true"
-            android:theme="@android:style/Theme.Translucent.NoTitleBar">
+            tools:node="merge">
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -17,11 +25,4 @@
             </intent-filter>
         </activity>
     </application>
-
-    <queries>
-        <!-- Custom Tabs support detection. -->
-        <intent>
-            <action android:name="android.support.customtabs.action.CustomTabsService" />
-        </intent>
-    </queries>
 </manifest>

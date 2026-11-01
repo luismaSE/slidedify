@@ -40,6 +40,7 @@ dependencies {
     implementation(project(":provider:spotify-api"))
 
     implementation(libs.androidx.browser)
+    implementation(libs.spotify.auth)
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.hilt.android)

@@ -62,13 +62,12 @@ internal class KeystoreCipher(private val alias: String) {
 
 private val Context.spotifyStore: DataStore<Preferences> by preferencesDataStore(name = "spotify_auth")
 
-/** Tokens and the in-flight login (PKCE verifier + state), encrypted at rest. */
+/** Spotify tokens, encrypted at rest. */
 internal class SecureTokenStore(context: Context) : TokenStore {
     private val store = context.applicationContext.spotifyStore
     private val cipher = KeystoreCipher("slidedify_spotify")
     private val json = Json { ignoreUnknownKeys = true }
     private val tokensKey = stringPreferencesKey("tokens")
-    private val pendingKey = stringPreferencesKey("pending_login")
 
     override suspend fun load(): SpotifyTokens? = read(tokensKey)?.let {
         runCatching { json.decodeFromString(SpotifyTokens.serializer(), it) }.getOrNull()
@@ -78,17 +77,6 @@ internal class SecureTokenStore(context: Context) : TokenStore {
 
     override suspend fun clear() {
         store.edit { it.remove(tokensKey) }
-    }
-
-    /** The app may be killed while the browser is open, so the PKCE verifier is persisted. */
-    suspend fun savePendingLogin(state: String, verifier: String) = write(pendingKey, "$state|$verifier")
-
-    /** Returns the verifier if [state] matches the one we sent (CSRF protection), then forgets it. */
-    suspend fun takePendingVerifier(state: String): String? {
-        val pending = read(pendingKey)
-        store.edit { it.remove(pendingKey) }
-        val (savedState, verifier) = pending?.split('|', limit = 2)?.takeIf { it.size == 2 } ?: return null
-        return verifier.takeIf { savedState == state }
     }
 
     private suspend fun read(key: Preferences.Key<String>): String? {
