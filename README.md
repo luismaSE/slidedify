@@ -11,6 +11,9 @@ una canción por pantalla, se reproduce sola, y cada gesto la manda a la playlis
   marca varias playlists; soltar las confirma. La zona izquierda se divide en Omitir (arriba) y Cancelar (abajo).
 - Doble tap ♥ Me gusta · tap play/pausa · ↶ deshacer.
 
+- **⇄ Transferir**: copiar, mover o sincronizar playlists (o Me gusta) entre servicios conectados.
+
+📄 Análisis y propuestas de mejora: [docs/ANALISIS.md](docs/ANALISIS.md)
 📄 Propuesta de diseño, stack y arquitectura: [docs/PROPUESTA.md](docs/PROPUESTA.md)
 
 ## Estado
@@ -21,8 +24,10 @@ una canción por pantalla, se reproduce sola, y cada gesto la manda a la playlis
 | Sesión de ordenado con deshacer | ✅ `core:domain`, con tests |
 | Pantalla de swipe + rueda (Compose) | ✅ con datos y reproductor de prueba |
 | Arquitectura multi-proveedor (`MusicProvider` + registro) | ✅ |
-| Proveedor Spotify (login PKCE, Web API, reproducción) | 🧪 implementado, falta probar con una cuenta real |
-| Letras (LRCLIB), cola offline (Room + WorkManager) | ⏳ |
+| Proveedor Spotify (login, Web API, vistas previas) | ✅ probado con cuenta real |
+| Transferencias entre servicios (copiar / mover / sincronizar) | 🧪 implementado y testeado, falta probar con dos cuentas reales |
+| TIDAL y YouTube Music | 🧪 clientes testeados; se activan con su configuración (ver docs/ANALISIS.md §6) |
+| Cola offline (Room + WorkManager) | ✅ |
 
 ## Módulos
 
