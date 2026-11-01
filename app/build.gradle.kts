@@ -53,6 +53,7 @@ dependencies {
     implementation(project(":core:data"))
     implementation(project(":core:platform"))
     implementation(project(":lyrics:lrclib"))
+    implementation(project(":preview:deezer"))
     implementation(project(":feature:source"))
     implementation(project(":feature:swipe"))
     implementation(project(":feature:settings"))

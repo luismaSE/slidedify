@@ -323,8 +323,6 @@ private fun GestureArea(state: SwipeUiState, track: Track, actions: SwipeActions
                 ?.offset
                 ?.takeIf { it.length >= config.touchSlop * 3 }
                 ?.let { layout.sectorOf(it) }
-            EdgeGlow(zones, hoveredZone, Modifier.fillMaxSize())
-
             TrackCard(
                 track = track,
                 state = state,
@@ -339,6 +337,9 @@ private fun GestureArea(state: SwipeUiState, track: Track, actions: SwipeActions
                         alpha = if (gesture is GestureState.Wheel) 0.5f else 1f
                     },
             )
+
+            // In front of the card: the contour line and the zone name must never be hidden.
+            EdgeGlow(zones, hoveredZone, Modifier.fillMaxSize())
 
             state.tutorialStep?.let { step ->
                 if (gesture == GestureState.Idle) {
@@ -487,7 +488,7 @@ private fun TutorialCard(step: TutorialStep, canLike: Boolean, onSkip: () -> Uni
 @Composable
 private fun BottomBar(state: SwipeUiState, actions: SwipeActions, onAddDestination: () -> Unit) {
     val player = state.player
-    val duration = player.track?.durationMs ?: 0L
+    val duration = player.durationMs
     Column(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 12.dp)) {
         LinearProgressIndicator(
             progress = { if (duration > 0) player.positionMs.toFloat() / duration else 0f },
@@ -496,6 +497,13 @@ private fun BottomBar(state: SwipeUiState, actions: SwipeActions, onAddDestinati
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(formatTime(player.positionMs), style = MaterialTheme.typography.labelSmall)
             Text(formatTime(duration), style = MaterialTheme.typography.labelSmall)
+        }
+        if (player.error == null && (player.isPreview || player.notice != null)) {
+            Text(
+                player.notice ?: "Vista previa de 30 s",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
         player.error?.let { error ->
             Text(

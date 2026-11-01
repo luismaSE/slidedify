@@ -7,10 +7,11 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.ClipOp
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
@@ -20,7 +21,6 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.slidedify.core.designsystem.SkipColor
@@ -42,56 +42,57 @@ internal fun swipeZones(targets: List<SlotTarget>, layout: SectorLayout): List<Z
 }
 
 /**
- * Lights up the border of the gesture area with the colour of each swipe zone, so the playlists
- * are visible before touching. While dragging, the zone under the finger glows brighter and its
- * name appears inside that zone, near the edge.
+ * Coloured line following the screen contour (slightly inset), one colour per swipe zone, on a
+ * plain grey background. While dragging, the segment of the zone under the finger lights up and
+ * its name appears inside that zone. Drawn in front of the card so it's never hidden.
  */
 @Composable
 internal fun EdgeGlow(zones: List<Zone>, hovered: Sector?, modifier: Modifier = Modifier) {
     val textMeasurer = rememberTextMeasurer()
     Canvas(modifier) {
         val center = Offset(size.width / 2f, size.height / 2f)
-        // Soft wide glow, then a crisp thin border on top.
-        drawBand(zones, hovered, center, band = 26.dp, idleAlpha = 0.10f, hoveredAlpha = 0.35f, dimmedAlpha = 0.04f)
-        drawBand(zones, hovered, center, band = 5.dp, idleAlpha = 0.55f, hoveredAlpha = 1f, dimmedAlpha = 0.2f)
-
-        val zone = zones.firstOrNull { it.sector == hovered } ?: return@Canvas
-        drawZoneLabel(textMeasurer, zone, center)
+        val inset = 10.dp.toPx()
+        val contour = RoundRect(inset, inset, size.width - inset, size.height - inset, CornerRadius(28.dp.toPx()))
+        zones.forEach { zone ->
+            val isHovered = zone.sector == hovered
+            val alpha = when {
+                hovered == null -> 0.85f
+                isHovered -> 1f
+                else -> 0.3f
+            }
+            clipToZone(zone, center) {
+                if (isHovered) {
+                    // Soft halo around the lit segment.
+                    drawContour(contour, zone.color.copy(alpha = 0.25f), 14.dp.toPx())
+                    drawContour(contour, zone.color, 6.dp.toPx())
+                } else {
+                    drawContour(contour, zone.color.copy(alpha = alpha), 3.dp.toPx())
+                }
+            }
+        }
+        zones.firstOrNull { it.sector == hovered }?.let { drawZoneLabel(textMeasurer, it, center) }
     }
 }
 
-private fun DrawScope.drawBand(
-    zones: List<Zone>,
-    hovered: Sector?,
-    center: Offset,
-    band: Dp,
-    idleAlpha: Float,
-    hoveredAlpha: Float,
-    dimmedAlpha: Float,
-) {
-    val inset = band.toPx()
-    val corner = 24.dp.toPx()
-    val inner = Path().apply {
-        addRoundRect(RoundRect(inset, inset, size.width - inset, size.height - inset, CornerRadius(corner, corner)))
-    }
+/** Restricts drawing to the angular wedge of [zone] (seen from [center]), with a small gap at the ends. */
+private fun DrawScope.clipToZone(zone: Zone, center: Offset, block: DrawScope.() -> Unit) {
     val reach = hypot(size.width, size.height)
-    clipPath(inner, clipOp = ClipOp.Difference) {
-        zones.forEach { zone ->
-            val alpha = when {
-                hovered == null -> idleAlpha
-                hovered == zone.sector -> hoveredAlpha
-                else -> dimmedAlpha
-            }
-            drawArc(
-                color = zone.color.copy(alpha = alpha),
-                startAngle = -(zone.centerDegrees + zone.halfWidth),
-                sweepAngle = zone.halfWidth * 2,
-                useCenter = true,
-                topLeft = Offset(center.x - reach, center.y - reach),
-                size = Size(reach * 2, reach * 2),
-            )
-        }
+    val gap = 1.2f
+    val wedge = Path().apply {
+        moveTo(center.x, center.y)
+        arcTo(
+            rect = androidx.compose.ui.geometry.Rect(center.x - reach, center.y - reach, center.x + reach, center.y + reach),
+            startAngleDegrees = -(zone.centerDegrees + zone.halfWidth) + gap,
+            sweepAngleDegrees = zone.halfWidth * 2 - gap * 2,
+            forceMoveTo = false,
+        )
+        close()
     }
+    clipPath(wedge) { block() }
+}
+
+private fun DrawScope.drawContour(contour: RoundRect, color: Color, width: Float) {
+    drawPath(Path().apply { addRoundRect(contour) }, color, style = Stroke(width = width, cap = StrokeCap.Round))
 }
 
 /** Name of the zone, placed where its centre line meets the screen border (inset a bit). */

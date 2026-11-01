@@ -37,10 +37,12 @@ android {
 dependencies {
     implementation(project(":core:domain"))
     implementation(project(":core:platform"))
+    implementation(project(":core:media"))
     implementation(project(":provider:spotify-api"))
 
     implementation(libs.androidx.browser)
     implementation(libs.spotify.auth)
+    implementation(libs.spotify.app.remote)
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.hilt.android)

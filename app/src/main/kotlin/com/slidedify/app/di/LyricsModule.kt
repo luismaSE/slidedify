@@ -1,8 +1,10 @@
 package com.slidedify.app.di
 
 import com.slidedify.core.domain.lyrics.LyricsRepository
+import com.slidedify.core.domain.player.PreviewSource
 import com.slidedify.lyrics.lrclib.CachingLyricsRepository
 import com.slidedify.lyrics.lrclib.LrclibLyricsRepository
+import com.slidedify.preview.deezer.DeezerPreviewSource
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -26,4 +28,9 @@ object NetworkModule {
     @Singleton
     fun lyricsRepository(client: OkHttpClient): LyricsRepository =
         CachingLyricsRepository(LrclibLyricsRepository(client))
+
+    /** Short previews when a provider can't play the full track (any provider, no account needed). */
+    @Provides
+    @Singleton
+    fun previewSource(client: OkHttpClient): PreviewSource = DeezerPreviewSource(client)
 }

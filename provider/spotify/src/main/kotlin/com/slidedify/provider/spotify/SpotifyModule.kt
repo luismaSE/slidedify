@@ -6,7 +6,9 @@ import android.content.Intent
 import android.os.Bundle
 import android.util.Log
 import android.widget.Toast
+import com.slidedify.core.domain.player.PreviewSource
 import com.slidedify.core.domain.provider.MusicProvider
+import com.slidedify.core.media.PreviewPlayer
 import com.slidedify.core.model.ProviderId
 import com.slidedify.core.platform.ProviderSignIn
 import com.spotify.sdk.android.auth.AuthorizationClient
@@ -17,7 +19,11 @@ import com.slidedify.provider.spotify.api.Pkce
 import com.slidedify.provider.spotify.api.SPOTIFY
 import com.slidedify.provider.spotify.api.SpotifyAuthClient
 import com.slidedify.provider.spotify.api.SpotifyAuthConfig
+import com.slidedify.provider.spotify.api.SpotifyLibraryWriter
 import com.slidedify.provider.spotify.api.SpotifyMusicProvider
+import com.slidedify.provider.spotify.api.SpotifyPlaylistRepository
+import com.slidedify.provider.spotify.api.SpotifyProviderAuth
+import com.slidedify.provider.spotify.api.SpotifyTrackRepository
 import com.slidedify.provider.spotify.api.SpotifyWebApi
 import com.slidedify.provider.spotify.api.TokenProvider
 import dagger.Module
@@ -41,15 +47,29 @@ import javax.inject.Singleton
 class SpotifyComponents @Inject constructor(
     @ApplicationContext context: Context,
     client: OkHttpClient,
+    previewSource: PreviewSource,
 ) {
     val config = SpotifyAuthConfig(BuildConfig.SPOTIFY_CLIENT_ID, BuildConfig.SPOTIFY_REDIRECT_URI)
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     internal val tokenStore = SecureTokenStore(context)
     val authClient = SpotifyAuthClient(config, client)
     val tokens = TokenProvider(tokenStore, authClient)
-    val provider: SpotifyMusicProvider = SpotifyMusicProvider.create(SpotifyWebApi(client, tokens), tokens, scope).also {
-        scope.launch { it.auth.refresh() }
-    }
+    private val api = SpotifyWebApi(client, tokens)
+
+    /** Full track via the Spotify app (App Remote); 30 s previews when that isn't possible. */
+    private val player = SpotifyPlaybackChain(
+        full = AppRemotePlayer(context, config.clientId, config.redirectUri, scope),
+        preview = PreviewPlayer(previewSource),
+        scope = scope,
+    )
+
+    val provider = SpotifyMusicProvider(
+        auth = SpotifyProviderAuth(tokens, api),
+        tracks = SpotifyTrackRepository(api),
+        playlists = SpotifyPlaylistRepository(api),
+        writer = SpotifyLibraryWriter(api),
+        player = player,
+    ).also { scope.launch { it.auth.refresh() } }
 }
 
 @Module

@@ -17,6 +17,11 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        // Vendored SDKs that are not published to any public repository (see third_party/).
+        maven {
+            url = uri("third_party/maven")
+            content { includeModule("com.spotify.android", "app-remote") }
+        }
     }
 }
 
@@ -28,12 +33,14 @@ include(":app")
 include(":core:model")
 include(":core:domain")
 include(":lyrics:lrclib")
+include(":preview:deezer")
 
 // Android libraries.
 include(":core:designsystem")
 include(":core:datastore")
 include(":core:data")
 include(":core:platform")
+include(":core:media")
 include(":feature:source")
 include(":feature:swipe")
 include(":feature:settings")

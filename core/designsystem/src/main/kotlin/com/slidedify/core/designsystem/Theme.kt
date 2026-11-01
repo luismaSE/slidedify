@@ -10,11 +10,11 @@ private val DarkColors = darkColorScheme(
     primary = Color(0xFF3DDC97),
     onPrimary = Color(0xFF00210F),
     secondary = Color(0xFFB8C7FF),
-    background = Color(0xFF0E0F12),
+    background = Color(0xFF26282D), // neutral grey; playlist colours only on the contour line
     onBackground = Color(0xFFE6E7EB),
-    surface = Color(0xFF17191E),
+    surface = Color(0xFF32353B),
     onSurface = Color(0xFFE6E7EB),
-    surfaceVariant = Color(0xFF23262D),
+    surfaceVariant = Color(0xFF3B3E45),
     onSurfaceVariant = Color(0xFFA9AEB8),
     error = Color(0xFFFF6B6B),
 )
