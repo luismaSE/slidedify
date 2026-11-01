@@ -96,7 +96,7 @@ Sí son viables, pero **como modo avanzado opcional**, no por defecto.
 **Riesgos:** con 8 sectores de 45° la tasa de error sube mucho en uso con una mano (el pulgar hace arcos, no rectas). Las diagonales del lado izquierdo quedan pegadas a "omitir", y un error ahí hace perder la canción.
 
 **Propuesta:**
-- **5 playlists por defecto:** ↑ ↗ → ↘ ↓. Solo se usan diagonales del **lado derecho** (lejos de "omitir"). Sectores de 60° + **zona muerta** de ±7° en cada frontera: si el ángulo cae ahí, la tarjeta vuelve al centro en vez de adivinar.
+- **5 playlists por defecto:** ↑ ↗ → ↘ ↓. Solo se usan diagonales del **lado derecho** (lejos de "omitir"). Se usan **los mismos sectores que la rueda** (§3.3): 45° por playlist y toda la mitad izquierda para omitir, con **zona muerta** de ±5° en cada frontera: si el ángulo cae ahí, la tarjeta vuelve al centro en vez de adivinar.
 - Si el swipe en diagonal resulta impreciso, la **rueda joystick** (§3.3) es la alternativa exacta: mantener presionado, empujar un poco hacia el sector y soltar.
 - **Feedback mientras arrastra** (clave para que funcionen las diagonales): a medida que se arrastra, aparece en el borde hacia donde se arrastra un indicador con el color, ícono y nombre de la playlist destino, + vibración háptica corta al cambiar de sector. Así el usuario corrige antes de soltar.
 - Umbral de distancia ≥ 30 % del ancho **o** velocidad (fling) ≥ umbral; si no, vuelve al centro.
