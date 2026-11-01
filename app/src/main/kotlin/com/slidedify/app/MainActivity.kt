@@ -4,8 +4,8 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import com.slidedify.app.ui.swipe.SwipeRoute
-import com.slidedify.app.ui.theme.SlidedifyTheme
+import com.slidedify.core.designsystem.SlidedifyTheme
+import com.slidedify.feature.swipe.SwipeRoute
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint

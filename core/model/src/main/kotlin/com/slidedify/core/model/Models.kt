@@ -1,5 +1,10 @@
 package com.slidedify.core.model
 
+/** Identifies a music service (e.g. "spotify", "youtube-music", "tidal"). */
+@JvmInline
+value class ProviderId(val value: String)
+
+/** Track id as given by its provider; only unique together with [Track.provider]. */
 @JvmInline
 value class TrackId(val value: String)
 
@@ -18,20 +23,23 @@ data class Album(
     val releaseYear: Int?,
 )
 
+/** A song, independent of the service it comes from. */
 data class Track(
     val id: TrackId,
-    /** Spotify URI, e.g. `spotify:track:...`. Used for playback and playlist writes. */
-    val uri: String,
+    val provider: ProviderId,
     val title: String,
     val artists: List<Artist>,
     val album: Album,
     val durationMs: Long,
+    /** Link to open the track in the provider's own app or website (required by most providers' terms). */
+    val externalUrl: String? = null,
 ) {
     val artistNames: String get() = artists.joinToString(", ") { it.name }
 }
 
 data class Playlist(
     val id: PlaylistId,
+    val provider: ProviderId,
     val name: String,
     val imageUrl: String? = null,
 )

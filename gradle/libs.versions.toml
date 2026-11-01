@@ -1,4 +1,7 @@
 [versions]
+compileSdk = "37"
+targetSdk = "37"
+minSdk = "26"
 agp = "9.5.0"
 kotlin = "2.4.20"
 ksp = "2.3.13"
@@ -45,6 +48,7 @@ turbine = { module = "app.cash.turbine:turbine", version.ref = "turbine" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
+android-library = { id = "com.android.library", version.ref = "agp" }
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }

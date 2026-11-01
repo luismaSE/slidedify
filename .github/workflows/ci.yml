@@ -24,10 +24,10 @@ jobs:
       - uses: gradle/actions/setup-gradle@v5
 
       - name: Unit tests (domain + app)
-        run: ./gradlew :core:domain:test :app:testDebugUnitTest --stacktrace
+        run: ./gradlew :core:domain:test testDebugUnitTest --stacktrace
 
       - name: Android Lint
-        run: ./gradlew :app:lintDebug
+        run: ./gradlew lintDebug
 
       - name: Build debug APK
         run: ./gradlew :app:assembleDebug

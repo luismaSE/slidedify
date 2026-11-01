@@ -7,11 +7,21 @@ import com.slidedify.core.model.Track
 
 /** Where the tracks to sort come from. */
 sealed interface TrackSource {
-    data object LikedSongs : TrackSource
+    val kind: Kind
 
-    data class FromPlaylist(val id: PlaylistId) : TrackSource
+    data object LikedSongs : TrackSource {
+        override val kind = Kind.LikedSongs
+    }
 
-    data object Recommended : TrackSource
+    data class FromPlaylist(val id: PlaylistId) : TrackSource {
+        override val kind = Kind.Playlist
+    }
+
+    data object Recommended : TrackSource {
+        override val kind = Kind.Recommended
+    }
+
+    enum class Kind { LikedSongs, Playlist, Recommended }
 }
 
 interface TrackRepository {
@@ -24,8 +34,8 @@ interface PlaylistRepository {
 }
 
 /**
- * Applies changes to the user's library. The real implementation queues them in a local outbox and
- * syncs in batches (see docs/PROPUESTA.md §5.4), so callers never wait for the network.
+ * Applies changes to the user's library. Real implementations queue them in a local outbox and
+ * sync in batches (see docs/PROPUESTA.md §5.4), so callers never wait for the network.
  */
 interface LibraryRepository {
     suspend fun apply(effect: LibraryEffect)

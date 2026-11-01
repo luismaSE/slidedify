@@ -238,27 +238,51 @@ Idle ─down─▶ Pressing ─move > 8dp─▶ Swiping (swipe simple, §3.2)
 ### 5.1 Módulos
 
 ```
-:app                      → navegación, DI raíz, MainActivity
-:core:model               → modelos de dominio puros (Track, Playlist, SwipeAction…)
-:core:domain              → casos de uso + interfaces de repositorio (Kotlin puro, sin Android)
-:core:data                → implementaciones de repositorio, mapeo DTO → dominio
-:core:network             → Retrofit, cliente Spotify, cliente LRCLIB, cliente Last.fm, auth interceptor
-:core:database            → Room (outbox, historial, caché)
-:core:datastore           → preferencias + config de gestos (DataStore + Proto/serialization)
-:core:player              → wrapper de Spotify App Remote detrás de una interfaz `Player`
-:core:auth                → PKCE, refresh de tokens, almacenamiento cifrado
-:core:designsystem        → tema, componentes, íconos
-:core:testing             → fakes, reglas, datos de prueba
-:feature:onboarding
-:feature:source           → elegir playlist / fuente
-:feature:gestureconfig
-:feature:swipe            → pantalla principal
-:feature:summary
-:feature:settings
-build-logic/              → convention plugins de Gradle
+:app                      → MainActivity, DI raíz, junta los proveedores en el ProviderRegistry
+:core:model               → modelos puros e independientes del servicio (Track, Playlist, ProviderId, Slot…)
+:core:domain              → gestos, sesión, contratos (MusicProvider, repositorios, Player, Lyrics) — Kotlin puro
+:core:designsystem        → tema, colores por dirección, componentes
+:core:database            → (pendiente) Room: outbox, historial, caché
+:core:datastore           → (pendiente) preferencias + config de gestos
+:feature:swipe            → pantalla principal (swipe + rueda)
+:feature:onboarding, :feature:source, :feature:gestureconfig, :feature:settings → (pendientes)
+:provider:fake            → proveedor de prueba (sin cuenta), referencia para los reales
+:provider:spotify         → (pendiente) Web API + App Remote SDK + login PKCE
+:provider:youtubemusic    → (futuro)
+:provider:tidal           → (futuro)
+:lyrics:lrclib            → (pendiente) letras para cualquier proveedor
 ```
 
-Regla de dependencias: `feature → domain ← data`. Las features nunca dependen de `data` ni del SDK de Spotify directamente.
+Reglas de dependencias:
+- `feature:*` → solo `core:*`. Nunca un `provider:*` ni un SDK de un servicio.
+- `provider:*` → solo `core:domain` (+ su propio SDK). Los proveedores no se conocen entre sí.
+- `app` → todo, pero solo para armar el grafo de DI.
+
+### 5.1.1 Varios proveedores (Spotify hoy; YouTube Music, Tidal mañana)
+
+El dominio define un **puerto** `MusicProvider` y cada servicio es un **adaptador** en su propio módulo:
+
+```kotlin
+interface MusicProvider {
+    val id: ProviderId                 // "spotify", "youtube-music", "tidal"
+    val displayName: String
+    val capabilities: ProviderCapabilities  // canLike, canPlayFullTracks, sources, maxTracksPerWrite
+    val auth: ProviderAuth
+    val tracks: TrackRepository
+    val playlists: PlaylistRepository
+    val library: LibraryRepository
+    val player: Player
+}
+```
+
+- **Registro automático:** cada módulo `:provider:*` se agrega a un `Set<MusicProvider>` con Hilt (`@IntoSet`). `ProviderRegistry` los junta y expone el activo. Sumar Tidal = crear `:provider:tidal`, implementar la interfaz y agregar una línea en `app/build.gradle.kts`. No se toca ni el dominio ni la pantalla de swipe.
+- **Capacidades en vez de `if (spotify)`:** la UI consulta `capabilities` (p. ej. si `canLike = false`, el doble tap no hace nada). Así cada servicio declara lo que soporta.
+- **Modelo neutro:** `Track` lleva `provider: ProviderId` y un `externalUrl` para "Abrir en…". Nada de URIs de Spotify en el dominio.
+- **Letras independientes:** `LyricsRepository` busca por título/artista/duración, así LRCLIB sirve para todos los servicios.
+- **Login:** cada proveedor trae su propia pantalla de login (necesita una Activity); el dominio solo observa `AuthState`.
+- **Tests de contrato (siguiente paso):** una suite de tests común que cualquier implementación de `MusicProvider` debe pasar.
+
+Estado de las APIs (a verificar al implementar cada uno): YouTube Music no tiene API pública oficial de biblioteca/reproducción; habría que usar la YouTube Data API (playlists) con sus límites. Tidal tiene una API para desarrolladores con OAuth. Por eso conviene que `capabilities` sea flexible.
 
 ### 5.2 Fuente de "recomendadas" (sin `/recommendations`)
 `RecommendationSource` combina y deduplica:

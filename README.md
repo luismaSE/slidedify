@@ -16,18 +16,31 @@ una canción por pantalla, se reproduce sola, y cada gesto la manda a la playlis
 | Lógica de gestos (swipe, rueda, doble tap) | ✅ `core:domain`, con tests |
 | Sesión de ordenado con deshacer | ✅ `core:domain`, con tests |
 | Pantalla de swipe + rueda (Compose) | ✅ con datos y reproductor de prueba |
-| Login Spotify, Web API, reproducción real | ⏳ siguiente paso |
+| Arquitectura multi-proveedor (`MusicProvider` + registro) | ✅ |
+| Proveedor Spotify (login, Web API, reproducción) | ⏳ siguiente paso |
 | Letras (LRCLIB), cola offline (Room + WorkManager) | ⏳ |
 
 ## Módulos
 
 ```
-app/            UI Compose, ViewModel, DI (Hilt), datos de prueba
-core/model/     Modelos puros (Track, Playlist, Slot, GestureMap)
-core/domain/    Gestos (GestureReducer, SectorLayout), SortSession, interfaces de repositorio y Player
+app/                 Arma la app: DI y registro de proveedores
+core/model/          Modelos puros e independientes del servicio (Track, Playlist, ProviderId, Slot)
+core/domain/         Gestos, sesión con deshacer, contratos: MusicProvider, repositorios, Player, Lyrics
+core/designsystem/   Tema y colores
+feature/swipe/       Pantalla de swipe + rueda joystick y su ViewModel
+provider/fake/       Proveedor de prueba (sin cuenta)
 ```
 
 `core:model` y `core:domain` son Kotlin puro: se testean sin emulador.
+
+### Agregar un proveedor (Spotify, YouTube Music, Tidal…)
+
+1. Crear `provider/<nombre>/` como Android library e incluirlo en `settings.gradle.kts`.
+2. Implementar `MusicProvider` (auth, canciones, playlists, biblioteca, reproductor) y declarar sus `ProviderCapabilities`.
+3. Registrarlo con Hilt: `@Binds @IntoSet abstract fun bind(impl: MiProvider): MusicProvider` (ver `provider/fake`).
+4. Agregar `implementation(project(":provider:<nombre>"))` en `app/build.gradle.kts`.
+
+La pantalla de swipe y el dominio no cambian.
 
 ## Cómo correrlo
 

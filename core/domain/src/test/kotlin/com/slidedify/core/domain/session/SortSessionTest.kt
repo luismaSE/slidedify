@@ -3,6 +3,7 @@ package com.slidedify.core.domain.session
 import com.slidedify.core.model.Album
 import com.slidedify.core.model.Artist
 import com.slidedify.core.model.PlaylistId
+import com.slidedify.core.model.ProviderId
 import com.slidedify.core.model.Track
 import com.slidedify.core.model.TrackId
 import kotlin.test.Test
@@ -15,7 +16,7 @@ class SortSessionTest {
 
     private fun track(n: Int) = Track(
         id = TrackId("t$n"),
-        uri = "spotify:track:t$n",
+        provider = ProviderId("test"),
         title = "Song $n",
         artists = listOf(Artist("a", "Artist")),
         album = Album("al", "Album", imageUrl = null, releaseYear = 2020),
