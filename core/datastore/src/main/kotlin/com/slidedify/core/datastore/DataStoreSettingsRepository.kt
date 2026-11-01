@@ -12,7 +12,6 @@ import com.slidedify.core.domain.settings.SortSettings
 import com.slidedify.core.model.GestureMap
 import com.slidedify.core.model.PlaylistId
 import com.slidedify.core.model.ProviderId
-import com.slidedify.core.model.Slot
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -29,9 +28,9 @@ import javax.inject.Singleton
 /** Storage format, kept separate from the domain model so the latter stays free of serialization concerns. */
 @Serializable
 internal data class StoredSettings(
-    val version: Int = 1,
-    /** providerId -> slot name -> playlist ids */
-    val gestureMaps: Map<String, Map<String, List<String>>> = emptyMap(),
+    val version: Int = 2,
+    /** providerId -> ordered destinations -> playlist ids of each destination. (v1 used fixed slots; ignored.) */
+    val destinations: Map<String, List<List<String>>> = emptyMap(),
     val holdTimeoutMs: Long = SortSettings.DEFAULT_HOLD_TIMEOUT_MS,
     val leftHanded: Boolean = false,
     val haptics: Boolean = true,
@@ -44,11 +43,12 @@ internal object SettingsMapper {
     val json = Json { ignoreUnknownKeys = true }
 
     fun toDomain(stored: StoredSettings) = SortSettings(
-        gestureMaps = stored.gestureMaps.entries.associate { (provider, slots) ->
+        gestureMaps = stored.destinations.entries.associate { (provider, destinations) ->
             ProviderId(provider) to GestureMap(
-                slots.mapNotNull { (slot, ids) ->
-                    Slot.entries.firstOrNull { it.name == slot }?.let { it to ids.mapTo(linkedSetOf(), ::PlaylistId) }
-                }.toMap(),
+                destinations
+                    .map { ids -> ids.mapTo(linkedSetOf(), ::PlaylistId) }
+                    .filter { it.isNotEmpty() }
+                    .take(GestureMap.MAX_DESTINATIONS),
             )
         },
         holdTimeoutMs = stored.holdTimeoutMs.coerceIn(SortSettings.HOLD_TIMEOUT_RANGE),
@@ -60,8 +60,8 @@ internal object SettingsMapper {
     )
 
     fun toStored(settings: SortSettings) = StoredSettings(
-        gestureMaps = settings.gestureMaps.entries.associate { (provider, map) ->
-            provider.value to map.targets.entries.associate { (slot, ids) -> slot.name to ids.map { it.value } }
+        destinations = settings.gestureMaps.entries.associate { (provider, map) ->
+            provider.value to map.destinations.map { ids -> ids.map { it.value } }
         },
         holdTimeoutMs = settings.holdTimeoutMs,
         leftHanded = settings.leftHanded,

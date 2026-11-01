@@ -47,8 +47,9 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
-import com.slidedify.core.designsystem.arrow
+import com.slidedify.core.designsystem.arrowFor
 import com.slidedify.core.designsystem.color
+import com.slidedify.core.domain.gesture.SectorLayout
 import com.slidedify.core.domain.provider.ProviderRegistry
 import com.slidedify.core.domain.settings.ButtonMode
 import com.slidedify.core.domain.settings.SettingsRepository
@@ -71,7 +72,7 @@ data class SettingsUiState(
     val isLoading: Boolean = true,
     val providerName: String = "",
     val playlists: List<Playlist> = emptyList(),
-    val gestureMap: GestureMap = GestureMap(emptyMap()),
+    val gestureMap: GestureMap = GestureMap.Empty,
     val settings: SortSettings = SortSettings(),
 )
 
@@ -101,9 +102,16 @@ class GestureSettingsViewModel @Inject constructor(
         viewModelScope.launch { playlists.value = provider.playlists.writablePlaylists() }
     }
 
-    fun assign(slot: Slot, ids: Set<PlaylistId>) = update { settings ->
+    /** Replaces the playlists of a destination; an empty selection removes it. */
+    fun assign(slot: Slot, ids: Set<PlaylistId>) = editMap { it.replace(slot, ids) }
+
+    fun addDestination(ids: Set<PlaylistId>) = editMap { it.add(ids) }
+
+    fun removeDestination(slot: Slot) = editMap { it.remove(slot) }
+
+    private fun editMap(edit: (GestureMap) -> GestureMap) = update { settings ->
         val current = settings.gestureMapFor(provider.id, playlists.value.orEmpty())
-        settings.withGestureMap(provider.id, current.withSlot(slot, ids))
+        settings.withGestureMap(provider.id, edit(current))
     }
 
     fun resetGestureMap() = update { it.copy(gestureMaps = it.gestureMaps - provider.id) }
@@ -132,6 +140,8 @@ fun GestureSettingsRoute(onBack: () -> Unit, viewModel: GestureSettingsViewModel
         state = state,
         onBack = onBack,
         onAssign = viewModel::assign,
+        onAddDestination = viewModel::addDestination,
+        onRemoveDestination = viewModel::removeDestination,
         onResetMap = viewModel::resetGestureMap,
         onLeftHanded = viewModel::setLeftHanded,
         onHaptics = viewModel::setHaptics,
@@ -148,6 +158,8 @@ fun GestureSettingsScreen(
     state: SettingsUiState,
     onBack: () -> Unit,
     onAssign: (Slot, Set<PlaylistId>) -> Unit,
+    onAddDestination: (Set<PlaylistId>) -> Unit,
+    onRemoveDestination: (Slot) -> Unit,
     onResetMap: () -> Unit,
     onLeftHanded: (Boolean) -> Unit,
     onHaptics: (Boolean) -> Unit,
@@ -156,6 +168,7 @@ fun GestureSettingsScreen(
     onButtonMode: (ButtonMode) -> Unit,
     onReplayTutorial: () -> Unit,
 ) {
+    // null = closed, NEW = adding a destination, otherwise the slot being edited.
     var editing by remember { mutableStateOf<Slot?>(null) }
 
     Scaffold(
@@ -172,28 +185,36 @@ fun GestureSettingsScreen(
         }
         val settings = state.settings
         LazyColumn(Modifier.fillMaxSize().padding(padding)) {
-            item { SectionTitle("Direcciones (${state.providerName})") }
+            item { SectionTitle("Destinos (${state.providerName})") }
             item {
                 Text(
-                    "Tocá una dirección para elegir sus playlists. Si elegís varias, se agrega a todas (combo).",
+                    "El círculo se reparte en partes iguales entre los destinos y la zona de cancelar " +
+                        "(1 destino: mitades, 2: tercios, 3: cuartos…). Cada destino puede agregar a varias playlists (combo).",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(horizontal = 16.dp),
                 )
             }
-            items(Slot.entries, key = { it.name }) { slot ->
-                val ids = state.gestureMap.targets[slot].orEmpty()
+            val layout = SectorLayout(state.gestureMap.size, settings.leftHanded)
+            items(state.gestureMap.slots, key = { it.index }) { slot ->
+                val ids = state.gestureMap.playlistsAt(slot)
                 val names = state.playlists.filter { it.id in ids }.joinToString(" + ") { it.name }
                 ListItem(
-                    leadingContent = { SlotBadge(slot, settings.leftHanded) },
-                    headlineContent = { Text(names.ifEmpty { "Sin asignar" }) },
-                    supportingContent = { Text(slotDescription(slot, settings.leftHanded)) },
+                    leadingContent = { SlotBadge(slot, arrowFor(layout.centerOf(slot))) },
+                    headlineContent = { Text(names) },
+                    supportingContent = { Text("Tocá para cambiar las playlists") },
+                    trailingContent = {
+                        TextButton(onClick = { onRemoveDestination(slot) }) { Text("Quitar") }
+                    },
                     modifier = Modifier.clickable(role = Role.Button) { editing = slot },
                 )
             }
             item {
-                TextButton(onClick = onResetMap, modifier = Modifier.padding(horizontal = 8.dp)) {
-                    Text("Restablecer direcciones")
+                Row(Modifier.padding(horizontal = 8.dp)) {
+                    TextButton(onClick = { editing = NEW }, enabled = !state.gestureMap.isFull) {
+                        Text(if (state.gestureMap.isFull) "Máximo ${GestureMap.MAX_DESTINATIONS} destinos" else "+ Agregar destino")
+                    }
+                    TextButton(onClick = onResetMap) { Text("Restablecer") }
                 }
                 HorizontalDivider()
             }
@@ -250,13 +271,14 @@ fun GestureSettingsScreen(
     }
 
     editing?.let { slot ->
+        val isNew = slot == NEW
         PlaylistPickerDialog(
-            slot = slot,
+            title = if (isNew) "Nuevo destino" else "Playlists de este destino",
             playlists = state.playlists,
-            initial = state.gestureMap.targets[slot].orEmpty(),
+            initial = if (isNew) emptySet() else state.gestureMap.playlistsAt(slot),
             onDismiss = { editing = null },
             onConfirm = {
-                onAssign(slot, it)
+                if (isNew) onAddDestination(it) else onAssign(slot, it)
                 editing = null
             },
         )
@@ -286,50 +308,30 @@ private fun SwitchRow(title: String, subtitle: String, checked: Boolean, onChang
     )
 }
 
+/** Marker for "adding a new destination" in the editor state. */
+private val NEW = Slot(-1)
+
 @Composable
-private fun SlotBadge(slot: Slot, leftHanded: Boolean) {
+private fun SlotBadge(slot: Slot, arrow: String) {
     Surface(shape = CircleShape, color = slot.color(), modifier = Modifier.size(40.dp)) {
         Box(contentAlignment = Alignment.Center) {
-            Text(mirroredArrow(slot, leftHanded), color = Color.Black, fontWeight = FontWeight.Bold)
+            Text(arrow, color = Color.Black, fontWeight = FontWeight.Bold)
         }
-    }
-}
-
-private fun mirroredArrow(slot: Slot, leftHanded: Boolean): String = if (!leftHanded) {
-    slot.arrow()
-} else {
-    when (slot) {
-        Slot.UP -> "↑"
-        Slot.UP_RIGHT -> "↖"
-        Slot.RIGHT -> "←"
-        Slot.DOWN_RIGHT -> "↙"
-        Slot.DOWN -> "↓"
-    }
-}
-
-private fun slotDescription(slot: Slot, leftHanded: Boolean): String {
-    val side = if (leftHanded) "izquierda" else "derecha"
-    return when (slot) {
-        Slot.UP -> "Deslizar hacia arriba"
-        Slot.UP_RIGHT -> "Deslizar en diagonal arriba a la $side"
-        Slot.RIGHT -> "Deslizar hacia la $side"
-        Slot.DOWN_RIGHT -> "Deslizar en diagonal abajo a la $side"
-        Slot.DOWN -> "Deslizar hacia abajo"
     }
 }
 
 @Composable
 private fun PlaylistPickerDialog(
-    slot: Slot,
+    title: String,
     playlists: List<Playlist>,
     initial: Set<PlaylistId>,
     onDismiss: () -> Unit,
     onConfirm: (Set<PlaylistId>) -> Unit,
 ) {
-    var selected by remember(slot) { mutableStateOf(initial) }
+    var selected by remember(title) { mutableStateOf(initial) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("${slot.arrow()} Playlists para esta dirección") },
+        title = { Text(title) },
         text = {
             LazyColumn(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 items(playlists, key = { it.id.value }) { playlist ->
@@ -349,7 +351,7 @@ private fun PlaylistPickerDialog(
                 }
             }
         },
-        confirmButton = { TextButton(onClick = { onConfirm(selected) }) { Text("Listo") } },
+        confirmButton = { TextButton(onClick = { onConfirm(selected) }, enabled = selected.isNotEmpty()) { Text("Listo") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } },
     )
 }

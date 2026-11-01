@@ -16,11 +16,8 @@ data class GestureConfig(
     val wheelActivationRadius: Float,
     /** Wheel: coming back inside this radius re-arms the next toggle. Must be < activation radius. */
     val wheelResetRadius: Float,
-    val deadZoneDegrees: Float = 5f,
-    /** Slots that have playlists assigned; the others cannot be selected. */
-    val enabledSlots: Set<Slot> = Slot.entries.toSet(),
-    /** Left-handed mode: playlists on the left half, skip/cancel on the right. */
-    val mirrored: Boolean = false,
+    /** How the circle is split between destinations and the cancel sector. */
+    val layout: SectorLayout = SectorLayout(destinationCount = 0),
 ) {
     init {
         require(wheelResetRadius < wheelActivationRadius) { "Reset radius must be smaller than activation radius" }
@@ -65,18 +62,12 @@ sealed interface GestureState {
     ) : GestureState
 }
 
-sealed interface SwipeResult {
-    data object Skip : SwipeResult
-
-    data class ToSlot(val slot: Slot) : SwipeResult
-}
-
 sealed interface GestureOutcome {
     data class Tap(val position: Point, val timeMs: Long) : GestureOutcome
 
-    data class Swipe(val result: SwipeResult) : GestureOutcome
+    data class Swipe(val slot: Slot) : GestureOutcome
 
-    /** Drag released without reaching a valid swipe: the card should spring back. */
+    /** Drag released without reaching a destination (too short, dead zone or cancel sector): spring back. */
     data object SwipeAborted : GestureOutcome
 
     data class WheelCommit(val slots: Set<Slot>) : GestureOutcome
@@ -146,7 +137,7 @@ class GestureReducer(private val config: GestureConfig) {
         val vector = position - state.origin
         val radius = vector.length
         val outside = radius >= config.wheelActivationRadius
-        val sector = if (outside) SectorLayout.sectorOf(vector, config.deadZoneDegrees, config.mirrored) else null
+        val sector = if (outside) config.layout.sectorOf(vector) else null
 
         var selected = state.selected
         var armed = state.armed
@@ -154,7 +145,7 @@ class GestureReducer(private val config: GestureConfig) {
 
         if (radius <= config.wheelResetRadius) armed = true
 
-        if (armed && sector is Sector.Destination && sector.slot in config.enabledSlots) {
+        if (armed && sector is Sector.Destination) {
             armed = false
             if (sector.slot in selected) {
                 selected = selected - sector.slot
@@ -165,7 +156,7 @@ class GestureReducer(private val config: GestureConfig) {
             }
         }
 
-        if (sector == Sector.Left && state.hovered != Sector.Left) {
+        if (sector == Sector.Cancel && state.hovered != Sector.Cancel) {
             armed = false
             feedback = GestureFeedback.EnteredCancel
         }
@@ -177,15 +168,15 @@ class GestureReducer(private val config: GestureConfig) {
     private fun onUp(state: GestureState, input: PointerInput.Up): GestureStep = when (state) {
         is GestureState.Pressing -> GestureStep(GestureState.Idle, GestureOutcome.Tap(input.position, input.timeMs))
         is GestureState.Dragging -> {
-            val result = classifySwipe(input.position - state.origin, input.velocity)
-            val outcome = result?.let(GestureOutcome::Swipe) ?: GestureOutcome.SwipeAborted
+            val slot = classifySwipe(input.position - state.origin, input.velocity)
+            val outcome = slot?.let(GestureOutcome::Swipe) ?: GestureOutcome.SwipeAborted
             GestureStep(GestureState.Idle, outcome)
         }
 
         is GestureState.Wheel -> {
             val vector = input.position - state.origin
             val releasedOnCancel = vector.length >= config.wheelActivationRadius &&
-                SectorLayout.sectorOf(vector, config.deadZoneDegrees, config.mirrored) == Sector.Left
+                config.layout.sectorOf(vector) == Sector.Cancel
             val outcome = when {
                 releasedOnCancel -> GestureOutcome.WheelCancelled
                 state.selected.isEmpty() -> GestureOutcome.WheelDismissed
@@ -198,19 +189,15 @@ class GestureReducer(private val config: GestureConfig) {
     }
 
     /**
-     * A swipe counts when the drag is long enough, or short but fast (a fling). The direction comes
-     * from the displacement, or from the velocity for short flings.
+     * Destination for a released drag: long enough, or short but fast (a fling). The direction comes
+     * from the displacement, or from the velocity for short flings. The cancel sector returns `null`.
      */
-    fun classifySwipe(displacement: Point, velocity: Point): SwipeResult? {
+    fun classifySwipe(displacement: Point, velocity: Point): Slot? {
         val direction = when {
             displacement.length >= config.swipeDistance -> displacement
             velocity.length >= config.flingVelocity -> velocity
             else -> return null
         }
-        return when (val sector = SectorLayout.sectorOf(direction, config.deadZoneDegrees, config.mirrored)) {
-            Sector.Left -> SwipeResult.Skip
-            is Sector.Destination -> if (sector.slot in config.enabledSlots) SwipeResult.ToSlot(sector.slot) else null
-            null -> null
-        }
+        return (config.layout.sectorOf(direction) as? Sector.Destination)?.slot
     }
 }

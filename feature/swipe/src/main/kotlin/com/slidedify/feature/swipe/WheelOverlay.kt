@@ -23,19 +23,18 @@ import com.slidedify.core.designsystem.color
 import com.slidedify.core.domain.gesture.GestureState
 import com.slidedify.core.domain.gesture.Sector
 import com.slidedify.core.domain.gesture.SectorLayout
-import com.slidedify.core.model.Slot
 import kotlin.math.cos
 import kotlin.math.sin
 
 /**
- * Joystick wheel drawn around the touch origin. Compose arcs go clockwise from 3 o'clock, so a
- * math angle `a` (counter-clockwise, 0° = right) becomes `-a` here.
+ * Joystick wheel drawn around the touch origin, split evenly between the destinations and the
+ * cancel sector. Compose arcs go clockwise from 3 o'clock, so a math angle `a` becomes `-a` here.
  */
 @Composable
 fun WheelOverlay(
     wheel: GestureState.Wheel,
-    targets: Map<Slot, SlotTarget>,
-    mirrored: Boolean,
+    targets: List<SlotTarget>,
+    layout: SectorLayout,
     modifier: Modifier = Modifier,
 ) {
     val textMeasurer = rememberTextMeasurer()
@@ -46,39 +45,30 @@ fun WheelOverlay(
             wheel.origin.x.coerceIn(radius, (size.width - radius).coerceAtLeast(radius)),
             wheel.origin.y.coerceIn(radius, (size.height - radius).coerceAtLeast(radius)),
         )
+        val halfWidth = layout.sectorWidth / 2f
         drawRect(Color.Black.copy(alpha = 0.55f))
 
-        Slot.entries.forEach { slot ->
-            val enabled = slot in targets
+        targets.forEach { target ->
+            val slot = target.slot
             val alpha = when {
                 slot in wheel.selected -> 0.9f
                 wheel.hovered == Sector.Destination(slot) -> 0.55f
-                enabled -> 0.22f
-                else -> 0.05f
+                else -> 0.25f
             }
-            val angle = SectorLayout.displayAngle(slot.centerDegrees, mirrored)
-            drawSector(center, radius, angle, SectorLayout.SLOT_HALF_WIDTH, slot.color().copy(alpha))
+            drawSector(center, radius, layout.centerOf(slot), halfWidth, slot.color().copy(alpha))
         }
-        val cancelHovered = wheel.hovered == Sector.Left
-        drawSector(
-            center,
-            radius,
-            centerDegrees = SectorLayout.displayAngle(180f, mirrored),
-            halfWidth = (SectorLayout.LEFT_END - SectorLayout.LEFT_START) / 2f,
-            color = CancelColor.copy(alpha = if (cancelHovered) 0.75f else 0.18f),
-        )
+        val cancelHovered = wheel.hovered == Sector.Cancel
+        drawSector(center, radius, layout.cancelCenter, halfWidth, CancelColor.copy(alpha = if (cancelHovered) 0.75f else 0.18f))
 
         val activation = WheelActivationRadius.toPx()
         drawCircle(Color(0xFF0E0F12), radius = activation, center = center)
         drawCircle(Color.White.copy(alpha = 0.25f), radius = activation, center = center, style = Stroke(1.dp.toPx()))
 
-        Slot.entries.forEach { slot ->
-            val target = targets[slot] ?: return@forEach
-            val check = if (slot in wheel.selected) "✓ " else ""
-            val angle = SectorLayout.displayAngle(slot.centerDegrees, mirrored)
-            drawLabel(textMeasurer, "$check${target.label}", center, radius * 0.7f, angle)
+        targets.forEach { target ->
+            val check = if (target.slot in wheel.selected) "✓ " else ""
+            drawLabel(textMeasurer, "$check${target.label}", center, radius * 0.68f, layout.centerOf(target.slot))
         }
-        drawLabel(textMeasurer, "✕\nCancelar", center, radius * 0.66f, SectorLayout.displayAngle(180f, mirrored))
+        drawLabel(textMeasurer, "✕\nCancelar", center, radius * 0.66f, layout.cancelCenter)
 
         val count = wheel.selected.size
         drawLabel(textMeasurer, if (count == 0) "empujá\nel pulgar" else "✓ $count", center, 0f, 0f, small = count == 0)
@@ -90,7 +80,7 @@ fun WheelOverlay(
 }
 
 private fun DrawScope.drawSector(center: Offset, radius: Float, centerDegrees: Float, halfWidth: Float, color: Color) {
-    val gap = 1.5f
+    val gap = minOf(1.5f, halfWidth / 4f)
     drawArc(
         color = color,
         startAngle = -(centerDegrees + halfWidth) + gap,
@@ -115,13 +105,13 @@ private fun DrawScope.drawLabel(
         text = text,
         style = TextStyle(
             color = Color.White,
-            fontSize = if (small) 11.sp else 13.sp,
+            fontSize = if (small) 11.sp else 12.sp,
             fontWeight = FontWeight.SemiBold,
             textAlign = TextAlign.Center,
         ),
         overflow = TextOverflow.Ellipsis,
         maxLines = 2,
-        constraints = Constraints(maxWidth = 84.dp.roundToPx()),
+        constraints = Constraints(maxWidth = 76.dp.roundToPx()),
     )
     drawText(layout, topLeft = anchor - Offset(layout.size.width / 2f, layout.size.height / 2f))
 }

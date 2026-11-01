@@ -3,7 +3,6 @@ package com.slidedify.feature.swipe
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.slidedify.core.domain.gesture.SwipeResult
 import com.slidedify.core.domain.lyrics.Lyrics
 import com.slidedify.core.domain.lyrics.LyricsRepository
 import com.slidedify.core.domain.outbox.SyncStatus
@@ -17,6 +16,7 @@ import com.slidedify.core.domain.session.SessionUpdate
 import com.slidedify.core.domain.session.SortSession
 import com.slidedify.core.domain.settings.SettingsRepository
 import com.slidedify.core.domain.settings.SortSettings
+import com.slidedify.core.model.GestureMap
 import com.slidedify.core.model.Playlist
 import com.slidedify.core.model.PlaylistId
 import com.slidedify.core.model.Slot
@@ -62,7 +62,11 @@ data class SwipeUiState(
     val total: Int = 0,
     val isLiked: Boolean = false,
     val canUndo: Boolean = false,
-    val targets: Map<Slot, SlotTarget> = emptyMap(),
+    /** Destinations in circle order; the circle is split evenly between them plus cancel. */
+    val targets: List<SlotTarget> = emptyList(),
+    /** Playlists that can still be added as a new destination. */
+    val addablePlaylists: List<Playlist> = emptyList(),
+    val canCreatePlaylists: Boolean = false,
     val player: PlayerState = PlayerState(),
     val lyrics: LyricsState = LyricsState.Loading,
     val pendingSync: Int = 0,
@@ -70,7 +74,9 @@ data class SwipeUiState(
     val tutorialStep: TutorialStep? = null,
 ) {
     val isFinished: Boolean get() = !isLoading && current == null
-    val enabledSlots: Set<Slot> get() = targets.keys
+    val canAddDestination: Boolean get() = targets.size < GestureMap.MAX_DESTINATIONS
+
+    fun target(slot: Slot): SlotTarget? = targets.getOrNull(slot.index)
 }
 
 /** One-off messages for the snackbar. */
@@ -82,6 +88,12 @@ sealed interface SwipeEvent {
     data class LikeChanged(val liked: Boolean) : SwipeEvent
 
     data object Undone : SwipeEvent
+
+    data class DestinationAdded(val playlistName: String) : SwipeEvent
+
+    data object DestinationsFull : SwipeEvent
+
+    data class Error(val message: String) : SwipeEvent
 }
 
 /** Navigation arguments, read from [SavedStateHandle] so this module does not depend on the app's routes. */
@@ -148,6 +160,7 @@ class SwipeViewModel @Inject constructor(
             if (session == null) return@combine base
             val current = session.current
             val byId = playlists.associateBy { it.id }
+            val map = settings.gestureMapFor(provider.id, playlists)
             base.copy(
                 isLoading = false,
                 current = current,
@@ -155,9 +168,9 @@ class SwipeViewModel @Inject constructor(
                 total = session.tracks.size,
                 isLiked = current?.let(session::isLiked) ?: false,
                 canUndo = session.canUndo,
-                targets = settings.gestureMapFor(provider.id, playlists).targets
-                    .mapValues { (slot, ids) -> SlotTarget(slot, ids.mapNotNull(byId::get)) }
-                    .filterValues { it.playlists.isNotEmpty() },
+                targets = map.slots.map { slot -> SlotTarget(slot, map.playlistsAt(slot).mapNotNull(byId::get)) },
+                addablePlaylists = playlists.filterNot { map.contains(it.id) },
+                canCreatePlaylists = provider.capabilities.canCreatePlaylists,
                 lyrics = lyricsState,
                 tutorialStep = step,
             )
@@ -177,16 +190,52 @@ class SwipeViewModel @Inject constructor(
         }
     }
 
-    fun onSwipe(result: SwipeResult) {
-        when (result) {
-            SwipeResult.Skip -> {
-                decide(Decision.Skip)
-                _events.trySend(SwipeEvent.Skipped)
-            }
-
-            is SwipeResult.ToSlot -> addTo(setOf(result.slot))
-        }
+    /** Swipe released over a destination. */
+    fun onSwipe(slot: Slot) {
+        addTo(setOf(slot))
         advanceTutorial(TutorialStep.Swipe)
+    }
+
+    /** "Omitir" button (bottom left). */
+    fun onSkip() {
+        if (session.value?.current == null) return
+        decide(Decision.Skip)
+        _events.trySend(SwipeEvent.Skipped)
+        advanceTutorial(TutorialStep.Swipe)
+    }
+
+    /** Adds an existing playlist as a new destination; the circle is re-split evenly. */
+    fun onAddDestination(playlist: Playlist) {
+        viewModelScope.launch {
+            var added = false
+            settingsRepository.update { current ->
+                val map = current.gestureMapFor(provider.id, playlists.value)
+                if (map.isFull || map.contains(playlist.id)) {
+                    current
+                } else {
+                    added = true
+                    current.withGestureMap(provider.id, map.add(setOf(playlist.id)))
+                }
+            }
+            _events.trySend(if (added) SwipeEvent.DestinationAdded(playlist.name) else SwipeEvent.DestinationsFull)
+        }
+    }
+
+    /** Creates a playlist in the provider and adds it as a destination. */
+    fun onCreatePlaylist(name: String) {
+        if (name.isBlank() || !provider.capabilities.canCreatePlaylists) return
+        viewModelScope.launch {
+            val created = try {
+                provider.playlists.createPlaylist(name.trim())
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _events.trySend(SwipeEvent.Error("No se pudo crear la playlist"))
+                return@launch
+            }
+            playlists.value = playlists.value + created
+            onAddDestination(created)
+        }
     }
 
     fun onWheelOpened() = advanceTutorial(TutorialStep.Wheel)

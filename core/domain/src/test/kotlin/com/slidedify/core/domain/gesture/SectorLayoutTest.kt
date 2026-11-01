@@ -17,6 +17,10 @@ class SectorLayoutTest {
         return Point((cos(rad) * length).toFloat(), (-sin(rad) * length).toFloat())
     }
 
+    private fun SectorLayout.at(degrees: Double) = sectorOf(vectorAt(degrees))
+
+    private fun dest(i: Int) = Sector.Destination(Slot(i))
+
     @Test
     fun `screen up is 90 degrees`() {
         assertEquals(90f, SectorLayout.angleOf(Point(0f, -10f)), 0.001f)
@@ -24,41 +28,56 @@ class SectorLayoutTest {
         assertEquals(180f, SectorLayout.angleOf(Point(-10f, 0f)), 0.001f)
     }
 
-    @ParameterizedTest(name = "{0}° -> {1}")
-    @CsvSource(
-        "0, RIGHT", "15, RIGHT", "345, RIGHT",
-        "45, UP_RIGHT", "30, UP_RIGHT", "60, UP_RIGHT",
-        "90, UP", "75, UP", "105, UP",
-        "315, DOWN_RIGHT", "300, DOWN_RIGHT", "330, DOWN_RIGHT",
-        "270, DOWN", "255, DOWN", "285, DOWN",
-    )
-    fun `right half maps to slots`(degrees: Double, slot: Slot) {
-        assertEquals(Sector.Destination(slot), SectorLayout.sectorOf(vectorAt(degrees), deadZoneDegrees = 5f))
-    }
-
-    @ParameterizedTest
-    @CsvSource("120", "180", "240", "135", "225")
-    fun `left half is the Left sector`(degrees: Double) {
-        assertEquals(Sector.Left, SectorLayout.sectorOf(vectorAt(degrees), deadZoneDegrees = 5f))
-    }
-
-    @ParameterizedTest
-    @CsvSource("22.5", "24", "67.5", "112.5", "110", "247.5", "292.5", "337.5")
-    fun `angles near a boundary fall in the dead zone`(degrees: Double) {
-        assertNull(SectorLayout.sectorOf(vectorAt(degrees), deadZoneDegrees = 5f))
+    @Test
+    fun `one playlist splits the circle in halves`() {
+        val layout = SectorLayout(1)
+        assertEquals(180f, layout.sectorWidth)
+        assertEquals(dest(0), layout.at(0.0))
+        assertEquals(dest(0), layout.at(60.0))
+        assertEquals(dest(0), layout.at(300.0))
+        assertEquals(Sector.Cancel, layout.at(180.0))
+        assertEquals(Sector.Cancel, layout.at(120.0))
+        assertNull(layout.at(90.0)) // boundary
     }
 
     @Test
-    fun `zero vector has no sector`() {
-        assertNull(SectorLayout.sectorOf(Point.Zero, deadZoneDegrees = 5f))
+    fun `two playlists split the circle in thirds`() {
+        val layout = SectorLayout(2)
+        assertEquals(120f, layout.sectorWidth)
+        assertEquals(60f, layout.centerOf(Slot(0)))
+        assertEquals(300f, layout.centerOf(Slot(1)))
+        assertEquals(dest(0), layout.at(60.0))
+        assertEquals(dest(1), layout.at(300.0))
+        assertEquals(Sector.Cancel, layout.at(180.0))
+    }
+
+    @ParameterizedTest(name = "3 playlists: {0}° -> {1}")
+    @CsvSource("90, 0", "0, 1", "270, 2", "60, 0", "330, 1", "240, 2")
+    fun `three playlists are up, right and down`(degrees: Double, index: Int) {
+        assertEquals(dest(index), SectorLayout(3).at(degrees))
     }
 
     @Test
-    fun `display angle mirrors horizontally`() {
-        assertEquals(180f, SectorLayout.displayAngle(0f, mirrored = true), 0.001f)
-        assertEquals(135f, SectorLayout.displayAngle(45f, mirrored = true), 0.001f)
-        assertEquals(90f, SectorLayout.displayAngle(90f, mirrored = true), 0.001f)
-        assertEquals(225f, SectorLayout.displayAngle(315f, mirrored = true), 0.001f)
-        assertEquals(45f, SectorLayout.displayAngle(45f, mirrored = false), 0.001f)
+    fun `eight playlists still have usable sectors`() {
+        val layout = SectorLayout(8)
+        assertEquals(40f, layout.sectorWidth)
+        (0 until 8).forEach { i -> assertEquals(dest(i), layout.at(layout.centerOf(Slot(i)).toDouble())) }
+        assertEquals(Sector.Cancel, layout.at(180.0))
+    }
+
+    @Test
+    fun `no playlists means everything cancels`() {
+        assertEquals(Sector.Cancel, SectorLayout(0).at(0.0))
+        assertNull(SectorLayout(0).sectorOf(Point.Zero))
+    }
+
+    @Test
+    fun `mirrored layout puts cancel on the right`() {
+        val layout = SectorLayout(3, mirrored = true)
+        assertEquals(Sector.Cancel, layout.at(0.0))
+        assertEquals(dest(1), layout.at(180.0))
+        assertEquals(dest(0), layout.at(90.0))
+        assertEquals(0f, layout.cancelCenter)
+        assertEquals(180f, layout.centerOf(Slot(1)))
     }
 }

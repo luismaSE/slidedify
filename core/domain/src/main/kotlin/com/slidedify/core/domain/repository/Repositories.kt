@@ -31,6 +31,12 @@ interface TrackRepository {
 interface PlaylistRepository {
     /** Playlists the user can write to (owned or collaborative). */
     suspend fun writablePlaylists(): List<Playlist>
+
+    /**
+     * Creates a playlist and returns it. Unlike track writes this is immediate (not queued),
+     * because the new id is needed right away. Only called when `capabilities.canCreatePlaylists`.
+     */
+    suspend fun createPlaylist(name: String): Playlist
 }
 
 /**

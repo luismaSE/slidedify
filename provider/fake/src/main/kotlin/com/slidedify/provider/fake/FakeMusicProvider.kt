@@ -115,7 +115,16 @@ class FakeTrackRepository @Inject constructor() : TrackRepository {
 
 @Singleton
 class FakePlaylistRepository @Inject constructor() : PlaylistRepository {
-    override suspend fun writablePlaylists(): List<Playlist> = FakeCatalog.playlists
+    private val playlists = MutableStateFlow(FakeCatalog.playlists)
+
+    override suspend fun writablePlaylists(): List<Playlist> = playlists.value
+
+    override suspend fun createPlaylist(name: String): Playlist {
+        delay(200)
+        val playlist = Playlist(PlaylistId("created-${System.currentTimeMillis()}"), FakeMusicProvider.ID, name.trim())
+        playlists.update { it + playlist }
+        return playlist
+    }
 }
 
 /** Pretends to call a remote API (with latency) and logs the writes. */

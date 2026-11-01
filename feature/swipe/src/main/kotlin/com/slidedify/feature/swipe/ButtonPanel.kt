@@ -24,7 +24,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.slidedify.core.designsystem.color
-import com.slidedify.core.domain.gesture.SwipeResult
 import com.slidedify.core.domain.settings.ButtonMode
 import com.slidedify.core.model.Slot
 import com.slidedify.core.model.Track
@@ -48,7 +47,7 @@ fun rememberButtonModeActive(mode: ButtonMode): Boolean {
 }
 
 /**
- * Accessible alternative to gestures: toggle the playlists, then "Agregar".
+ * Accessible alternative to gestures: toggle the playlists, then "Agregar" ("Omitir" is in the bottom bar).
  * Same result as the wheel, but every control is a large, labelled button.
  */
 @OptIn(ExperimentalLayoutApi::class)
@@ -57,7 +56,7 @@ internal fun ButtonPanel(track: Track, state: SwipeUiState, actions: SwipeAction
     var selected by remember(track.id) { mutableStateOf(emptySet<Slot>()) }
     Column(Modifier.padding(horizontal = 16.dp)) {
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Slot.entries.mapNotNull { state.targets[it] }.forEach { target ->
+            state.targets.forEach { target ->
                 val isSelected = target.slot in selected
                 FilterChip(
                     selected = isSelected,
@@ -71,7 +70,6 @@ internal fun ButtonPanel(track: Track, state: SwipeUiState, actions: SwipeAction
             }
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = { actions.onSwipe(SwipeResult.Skip) }) { Text("✕ Omitir") }
             if (state.canLike) {
                 OutlinedButton(onClick = actions.onDoubleTap) { Text(if (state.isLiked) "♥ Me gusta" else "♡ Me gusta") }
             }

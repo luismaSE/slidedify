@@ -1,7 +1,6 @@
 package com.slidedify.feature.swipe
 
 import androidx.lifecycle.SavedStateHandle
-import com.slidedify.core.domain.gesture.SwipeResult
 import com.slidedify.core.domain.lyrics.LyricLine
 import com.slidedify.core.domain.lyrics.Lyrics
 import com.slidedify.core.domain.lyrics.LyricsRepository
@@ -22,6 +21,7 @@ import com.slidedify.core.domain.session.LibraryEffect
 import com.slidedify.core.domain.settings.SettingsRepository
 import com.slidedify.core.domain.settings.SortSettings
 import com.slidedify.core.model.Album
+import com.slidedify.core.model.GestureMap
 import com.slidedify.core.model.Artist
 import com.slidedify.core.model.Playlist
 import com.slidedify.core.model.PlaylistId
@@ -64,8 +64,10 @@ class SwipeViewModelTest {
             durationMs = 180_000,
         )
     }
-    private val playlists = listOf("gym", "chill", "focus", "party", "running")
+    private val basePlaylists = listOf("gym", "chill", "focus", "party", "running")
         .map { Playlist(PlaylistId(it), providerId, it) }
+    private val extraPlaylists = mutableListOf<Playlist>()
+    private val playlists get() = basePlaylists + extraPlaylists
 
     private val library = RecordingLibrary()
     private val player = RecordingPlayer()
@@ -100,6 +102,8 @@ class SwipeViewModelTest {
             }
             override val playlists = object : PlaylistRepository {
                 override suspend fun writablePlaylists() = this@SwipeViewModelTest.playlists
+
+                override suspend fun createPlaylist(name: String) = Playlist(PlaylistId("new"), providerId, name)
             }
             override val writer: LibraryWriter get() = error("features must write through LibraryRepository")
             override val player: Player = this@SwipeViewModelTest.player
@@ -118,17 +122,23 @@ class SwipeViewModelTest {
         )
     }
 
+    private fun id(value: String) = PlaylistId(value)
+
+    /** Saves a gesture map with one destination per playlist id, in order. */
+    private fun useDestinations(vararg ids: String) =
+        settings.state.update { it.withGestureMap(providerId, GestureMap.of(ids.map(::PlaylistId))) }
+
     private fun TestScope.collect(vm: SwipeViewModel) {
         backgroundScope.launch(dispatcher) { vm.uiState.collect {} }
     }
 
     @Test
-    fun `first track starts playing automatically`() = runTest(dispatcher) {
+    fun `first track plays and the default circle has a single destination`() = runTest(dispatcher) {
         val vm = viewModel()
         collect(vm)
         assertEquals(tracks[0], vm.uiState.value.current)
         assertEquals(tracks[0], player.state.value.track)
-        assertEquals(5, vm.uiState.value.targets.size)
+        assertEquals(listOf(listOf(playlists[0])), vm.uiState.value.targets.map { it.playlists })
     }
 
     @Test
@@ -141,13 +151,14 @@ class SwipeViewModelTest {
 
     @Test
     fun `wheel commit writes to every selected playlist and moves on`() = runTest(dispatcher) {
+        useDestinations("gym", "chill", "focus")
         val vm = viewModel()
         collect(vm)
 
-        vm.onWheelCommit(setOf(Slot.UP, Slot.RIGHT))
+        vm.onWheelCommit(setOf(Slot(0), Slot(2)))
 
         assertEquals<List<LibraryEffect>>(
-            listOf(LibraryEffect.AddToPlaylists(tracks[0], setOf(PlaylistId("gym"), PlaylistId("focus")))),
+            listOf(LibraryEffect.AddToPlaylists(tracks[0], setOf(id("gym"), id("focus")))),
             library.effects,
         )
         assertEquals(tracks[1], vm.uiState.value.current)
@@ -155,23 +166,25 @@ class SwipeViewModelTest {
     }
 
     @Test
-    fun `saved gesture map with a combo is used`() = runTest(dispatcher) {
-        settings.state.update {
-            it.withGestureMap(
-                providerId,
-                com.slidedify.core.model.GestureMap(mapOf(Slot.DOWN to setOf(PlaylistId("chill"), PlaylistId("party")))),
-            )
-        }
+    fun `a combo destination adds to all its playlists`() = runTest(dispatcher) {
+        settings.state.update { it.withGestureMap(providerId, GestureMap(listOf(setOf(id("chill"), id("party"))))) }
         val vm = viewModel()
         collect(vm)
 
-        vm.onSwipe(SwipeResult.ToSlot(Slot.DOWN))
+        vm.onSwipe(Slot(0))
 
-        assertEquals(setOf(Slot.DOWN), vm.uiState.value.enabledSlots)
-        assertEquals<LibraryEffect>(
-            LibraryEffect.AddToPlaylists(tracks[0], setOf(PlaylistId("chill"), PlaylistId("party"))),
-            library.effects.single(),
-        )
+        assertEquals<LibraryEffect>(LibraryEffect.AddToPlaylists(tracks[0], setOf(id("chill"), id("party"))), library.effects.single())
+    }
+
+    @Test
+    fun `skip button moves on without writing`() = runTest(dispatcher) {
+        val vm = viewModel()
+        collect(vm)
+
+        vm.onSkip()
+
+        assertEquals(tracks[1], vm.uiState.value.current)
+        assertTrue(library.effects.isEmpty())
     }
 
     @Test
@@ -179,11 +192,47 @@ class SwipeViewModelTest {
         val vm = viewModel()
         collect(vm)
 
-        vm.onSwipe(SwipeResult.ToSlot(Slot.DOWN))
+        vm.onSwipe(Slot(0))
         vm.onUndo()
 
         assertEquals(tracks[0], vm.uiState.value.current)
-        assertEquals<LibraryEffect>(LibraryEffect.RemoveFromPlaylists(tracks[0], setOf(PlaylistId("running"))), library.effects.last())
+        assertEquals<LibraryEffect>(LibraryEffect.RemoveFromPlaylists(tracks[0], setOf(id("gym"))), library.effects.last())
+    }
+
+    @Test
+    fun `adding a destination re-splits the circle and is saved`() = runTest(dispatcher) {
+        val vm = viewModel()
+        collect(vm)
+
+        vm.onAddDestination(playlists[2])
+
+        assertEquals(listOf("gym", "focus"), vm.uiState.value.targets.map { it.label })
+        assertEquals(GestureMap.of(listOf(id("gym"), id("focus"))), settings.state.value.gestureMaps[providerId])
+        assertTrue(vm.uiState.value.addablePlaylists.none { it.id == id("focus") })
+    }
+
+    @Test
+    fun `no more than eight destinations`() = runTest(dispatcher) {
+        val many = (1..8).map { Playlist(id("p$it"), providerId, "p$it") }
+        settings.state.update { it.withGestureMap(providerId, GestureMap.of(many.map { p -> p.id })) }
+        extraPlaylists += many
+        val vm = viewModel()
+        collect(vm)
+
+        vm.onAddDestination(playlists[0])
+
+        assertEquals(8, vm.uiState.value.targets.size)
+        assertFalse(vm.uiState.value.canAddDestination)
+    }
+
+    @Test
+    fun `creating a playlist adds it as a destination`() = runTest(dispatcher) {
+        val vm = viewModel()
+        collect(vm)
+
+        vm.onCreatePlaylist("  Road trip ")
+
+        assertEquals(listOf("gym", "Road trip"), vm.uiState.value.targets.map { it.label })
     }
 
     @Test
@@ -216,7 +265,8 @@ class SwipeViewModelTest {
 
         assertEquals(listOf<TrackSource>(TrackSource.FromPlaylist(PlaylistId("gym"))), requestedSources)
         assertEquals("gym", vm.uiState.value.sourceName)
-        assertTrue(vm.uiState.value.targets.values.none { target -> target.playlists.any { it.id == PlaylistId("gym") } })
+        assertTrue(vm.uiState.value.targets.none { target -> target.playlists.any { it.id == PlaylistId("gym") } })
+        assertTrue(vm.uiState.value.addablePlaylists.none { it.id == PlaylistId("gym") })
     }
 
     @Test
@@ -234,7 +284,7 @@ class SwipeViewModelTest {
         collect(vm)
         assertEquals(TutorialStep.Swipe, vm.uiState.value.tutorialStep)
 
-        vm.onSwipe(SwipeResult.Skip)
+        vm.onSkip()
         assertEquals(TutorialStep.Wheel, vm.uiState.value.tutorialStep)
 
         vm.onWheelOpened()

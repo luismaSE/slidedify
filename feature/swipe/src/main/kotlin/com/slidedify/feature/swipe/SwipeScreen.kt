@@ -5,6 +5,7 @@ import androidx.compose.animation.core.VectorConverter
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -15,14 +16,22 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
@@ -69,8 +78,9 @@ import com.slidedify.core.domain.gesture.GestureState
 import com.slidedify.core.domain.gesture.GestureStep
 import com.slidedify.core.domain.gesture.Sector
 import com.slidedify.core.domain.gesture.SectorLayout
-import com.slidedify.core.domain.gesture.SwipeResult
 import com.slidedify.core.domain.gesture.TapKind
+import com.slidedify.core.model.GestureMap
+import com.slidedify.core.model.Playlist
 import com.slidedify.core.model.Slot
 import com.slidedify.core.model.Track
 import kotlinx.coroutines.Job
@@ -82,7 +92,10 @@ import kotlin.math.sin
 
 /** Callbacks of the sorting screen, grouped to keep signatures short. */
 data class SwipeActions(
-    val onSwipe: (SwipeResult) -> Unit = {},
+    val onSwipe: (Slot) -> Unit = {},
+    val onSkip: () -> Unit = {},
+    val onAddDestination: (Playlist) -> Unit = {},
+    val onCreatePlaylist: (String) -> Unit = {},
     val onWheelOpened: () -> Unit = {},
     val onWheelCommit: (Set<Slot>) -> Unit = {},
     val onDoubleTap: () -> Unit = {},
@@ -106,6 +119,9 @@ fun SwipeRoute(onBack: () -> Unit, onOpenSettings: () -> Unit, viewModel: SwipeV
                 SwipeEvent.Skipped -> "Omitida" to true
                 is SwipeEvent.LikeChanged -> (if (event.liked) "♥ Agregada a Me gusta" else "Quitada de Me gusta") to true
                 SwipeEvent.Undone -> "Deshecho" to false
+                is SwipeEvent.DestinationAdded -> "\"${event.playlistName}\" se sumó al círculo" to false
+                SwipeEvent.DestinationsFull -> "Máximo ${GestureMap.MAX_DESTINATIONS} destinos. Usá combos en Ajustes." to false
+                is SwipeEvent.Error -> event.message to false
             }
             launch {
                 val result = snackbar.showSnackbar(
@@ -123,6 +139,9 @@ fun SwipeRoute(onBack: () -> Unit, onOpenSettings: () -> Unit, viewModel: SwipeV
         snackbar = snackbar,
         actions = SwipeActions(
             onSwipe = viewModel::onSwipe,
+            onSkip = viewModel::onSkip,
+            onAddDestination = viewModel::onAddDestination,
+            onCreatePlaylist = viewModel::onCreatePlaylist,
             onWheelOpened = viewModel::onWheelOpened,
             onWheelCommit = viewModel::onWheelCommit,
             onDoubleTap = viewModel::onDoubleTap,
@@ -139,6 +158,7 @@ fun SwipeRoute(onBack: () -> Unit, onOpenSettings: () -> Unit, viewModel: SwipeV
 fun SwipeScreen(state: SwipeUiState, snackbar: SnackbarHostState, actions: SwipeActions) {
     val buttonMode = rememberButtonModeActive(state.settings.buttonMode)
     var showLyrics by remember { mutableStateOf(false) }
+    var showAddDestination by remember { mutableStateOf(false) }
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbar) },
@@ -163,8 +183,8 @@ fun SwipeScreen(state: SwipeUiState, snackbar: SnackbarHostState, actions: Swipe
                     } else {
                         GestureArea(state, track, actions, Modifier.weight(1f).fillMaxWidth())
                     }
-                    PlayerBar(state, actions.onTogglePlayback)
                     LyricsPanel(state.lyrics, state.player.positionMs, onOpen = { showLyrics = true })
+                    BottomBar(state, actions, onAddDestination = { showAddDestination = true })
                 }
             }
         }
@@ -173,6 +193,20 @@ fun SwipeScreen(state: SwipeUiState, snackbar: SnackbarHostState, actions: Swipe
     val lyrics = state.lyrics
     if (showLyrics && lyrics is LyricsState.Available) {
         LyricsSheet(lyrics.lyrics, state.player.positionMs, onDismiss = { showLyrics = false })
+    }
+    if (showAddDestination) {
+        AddDestinationSheet(
+            state = state,
+            onPick = {
+                actions.onAddDestination(it)
+                showAddDestination = false
+            },
+            onCreate = {
+                actions.onCreatePlaylist(it)
+                showAddDestination = false
+            },
+            onDismiss = { showAddDestination = false },
+        )
     }
 }
 
@@ -222,7 +256,8 @@ private fun GestureArea(state: SwipeUiState, track: Track, actions: SwipeActions
     val density = LocalDensity.current
     val settings = state.settings
     val mirrored = settings.leftHanded
-    val config = rememberGestureConfig(state.enabledSlots, settings.holdTimeoutMs, mirrored)
+    val config = rememberGestureConfig(state.targets.size, settings.holdTimeoutMs, mirrored)
+    val layout = config.layout
     val tapDetector = remember(density) { DoubleTapDetector(300, with(density) { 48.dp.toPx() }) }
     var singleTapJob by remember { mutableStateOf<Job?>(null) }
     var gesture by remember { mutableStateOf<GestureState>(GestureState.Idle) }
@@ -257,8 +292,8 @@ private fun GestureArea(state: SwipeUiState, track: Track, actions: SwipeActions
 
                 is GestureOutcome.Swipe -> scope.launch {
                     (previous as? GestureState.Dragging)?.let { cardOffset.snapTo(it.offset.toOffset()) }
-                    cardOffset.animateTo(flyOutTarget(outcome.result, flyDistance, mirrored), tween(180))
-                    actions.onSwipe(outcome.result)
+                    cardOffset.animateTo(flyOutTarget(layout.centerOf(outcome.slot), flyDistance), tween(180))
+                    actions.onSwipe(outcome.slot)
                     cardOffset.snapTo(Offset.Zero)
                 }
 
@@ -289,7 +324,7 @@ private fun GestureArea(state: SwipeUiState, track: Track, actions: SwipeActions
             )
 
             (gesture as? GestureState.Dragging)?.let { drag ->
-                DragHint(drag, state.targets, config.touchSlop * 3, mirrored, Modifier.align(Alignment.TopCenter))
+                DragHint(drag, state, layout, config.touchSlop * 3, Modifier.align(Alignment.TopCenter))
             }
 
             state.tutorialStep?.let { step ->
@@ -300,7 +335,7 @@ private fun GestureArea(state: SwipeUiState, track: Track, actions: SwipeActions
 
             if (gesture == GestureState.Idle && state.tutorialStep == null) {
                 Text(
-                    "Mantené presionado para elegir varias playlists",
+                    if (state.targets.isEmpty()) "Agregá una playlist con + para empezar" else "Mantené presionado para elegir varias playlists",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier
@@ -310,18 +345,14 @@ private fun GestureArea(state: SwipeUiState, track: Track, actions: SwipeActions
             }
 
             (gesture as? GestureState.Wheel)?.let { wheel ->
-                WheelOverlay(wheel, state.targets, mirrored, Modifier.fillMaxSize())
+                WheelOverlay(wheel, state.targets, layout, Modifier.fillMaxSize())
             }
         }
     }
 }
 
-private fun flyOutTarget(result: SwipeResult, distance: Float, mirrored: Boolean): Offset {
-    val layoutAngle = when (result) {
-        SwipeResult.Skip -> 180f
-        is SwipeResult.ToSlot -> result.slot.centerDegrees
-    }
-    val rad = Math.toRadians(SectorLayout.displayAngle(layoutAngle, mirrored).toDouble())
+private fun flyOutTarget(screenDegrees: Float, distance: Float): Offset {
+    val rad = Math.toRadians(screenDegrees.toDouble())
     return Offset((cos(rad) * distance).toFloat(), (-sin(rad) * distance).toFloat())
 }
 
@@ -336,17 +367,17 @@ private fun GestureFeedback.hapticType(): HapticFeedbackType = when (this) {
 @Composable
 private fun DragHint(
     drag: GestureState.Dragging,
-    targets: Map<Slot, SlotTarget>,
+    state: SwipeUiState,
+    layout: SectorLayout,
     minDistance: Float,
-    mirrored: Boolean,
     modifier: Modifier,
 ) {
     val offset = drag.offset
     if (offset.length < minDistance) return
-    val (text, color) = when (val sector = SectorLayout.sectorOf(offset, deadZoneDegrees = 5f, mirrored = mirrored)) {
-        Sector.Left -> "✕ Omitir" to CancelColor
+    val (text, color) = when (val sector = layout.sectorOf(offset)) {
+        Sector.Cancel -> "✕ Cancelar" to CancelColor
         is Sector.Destination -> {
-            val target = targets[sector.slot] ?: return
+            val target = state.target(sector.slot) ?: return
             target.label to sector.slot.color()
         }
 
@@ -365,9 +396,9 @@ private fun DragHint(
 private fun TrackCard(track: Track, state: SwipeUiState, actions: SwipeActions, modifier: Modifier = Modifier) {
     // Every gesture is also reachable from TalkBack's actions menu.
     val a11yActions = buildList {
-        add(CustomAccessibilityAction("Omitir") { actions.onSwipe(SwipeResult.Skip); true })
-        state.targets.values.forEach { target ->
-            add(CustomAccessibilityAction("Agregar a ${target.label}") { actions.onSwipe(SwipeResult.ToSlot(target.slot)); true })
+        add(CustomAccessibilityAction("Omitir") { actions.onSkip(); true })
+        state.targets.forEach { target ->
+            add(CustomAccessibilityAction("Agregar a ${target.label}") { actions.onSwipe(target.slot); true })
         }
         if (state.canLike) {
             add(CustomAccessibilityAction(if (state.isLiked) "Quitar de Me gusta" else "Me gusta") { actions.onDoubleTap(); true })
@@ -433,7 +464,7 @@ private fun TrackCard(track: Track, state: SwipeUiState, actions: SwipeActions, 
 
 /** Deterministic gradient per album, used until real cover art is loaded. */
 private fun placeholderBrush(track: Track): Brush {
-    val palette = Slot.entries.map { it.color() }
+    val palette = (0 until GestureMap.MAX_DESTINATIONS).map { Slot(it).color() }
     val hash = abs(track.album.id.hashCode())
     val first = palette[hash % palette.size]
     val second = palette[(hash / palette.size + 1) % palette.size]
@@ -443,9 +474,11 @@ private fun placeholderBrush(track: Track): Brush {
 @Composable
 private fun TutorialCard(step: TutorialStep, canLike: Boolean, onSkip: () -> Unit, modifier: Modifier = Modifier) {
     val (title, body) = when (step) {
-        TutorialStep.Swipe -> "1/3 · Deslizá" to "← omitir. ↑ ↗ → ↘ ↓ agregan a una playlist. Podés deshacer con ↶."
+        TutorialStep.Swipe -> "1/3 · Deslizá" to
+            "Deslizá hacia una playlist para agregarla. ✕ Omitir (abajo a la izquierda) pasa a la siguiente; " +
+            "+ Playlist (abajo a la derecha) suma destinos. Deshacé con ↶."
         TutorialStep.Wheel -> "2/3 · Mantené presionado" to
-            "Aparece la rueda. Empujá el pulgar hacia una playlist y volvé al centro para marcar varias. Soltá para confirmar; soltá a la izquierda para cancelar."
+            "Aparece la rueda. Empujá el pulgar hacia una playlist y volvé al centro para marcar varias. Soltá para confirmar; soltá en ✕ para cancelar."
         TutorialStep.DoubleTap -> "3/3 · Doble toque" to
             if (canLike) "Tocá dos veces para agregar a Me gusta. Un toque pausa o reanuda." else "Un toque pausa o reanuda la canción."
     }
@@ -465,23 +498,82 @@ private fun TutorialCard(step: TutorialStep, canLike: Boolean, onSkip: () -> Uni
     }
 }
 
+/** Progress plus the bottom controls: skip (left), play/pause (centre), add playlist (right). */
 @Composable
-private fun PlayerBar(state: SwipeUiState, onTogglePlayback: () -> Unit) {
+private fun BottomBar(state: SwipeUiState, actions: SwipeActions, onAddDestination: () -> Unit) {
     val player = state.player
     val duration = player.track?.durationMs ?: 0L
-    Column(Modifier.padding(horizontal = 24.dp, vertical = 4.dp)) {
+    Column(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 12.dp)) {
         LinearProgressIndicator(
             progress = { if (duration > 0) player.positionMs.toFloat() / duration else 0f },
             modifier = Modifier.fillMaxWidth(),
         )
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(formatTime(player.positionMs), style = MaterialTheme.typography.labelSmall)
+            Text(formatTime(duration), style = MaterialTheme.typography.labelSmall)
+        }
         Row(
             Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            Text(formatTime(player.positionMs), style = MaterialTheme.typography.labelSmall)
-            TextButton(onClick = onTogglePlayback) { Text(if (player.isPlaying) "❚❚ Pausa" else "▶ Reproducir") }
-            Text(formatTime(duration), style = MaterialTheme.typography.labelSmall)
+            OutlinedButton(onClick = actions.onSkip) { Text("✕ Omitir") }
+            TextButton(onClick = actions.onTogglePlayback) {
+                Text(if (player.isPlaying) "❚❚ Pausa" else "▶ Reproducir")
+            }
+            Button(onClick = onAddDestination) { Text("+ Playlist") }
+        }
+    }
+}
+
+/** Adds an existing playlist as a new destination, or creates a new one. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AddDestinationSheet(
+    state: SwipeUiState,
+    onPick: (Playlist) -> Unit,
+    onCreate: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var newName by remember { mutableStateOf("") }
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(
+            Modifier
+                .padding(horizontal = 24.dp)
+                .padding(bottom = 24.dp),
+        ) {
+            Text("Agregar destino", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Text(
+                "El círculo se reparte en partes iguales entre las playlists y la zona de cancelar.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(12.dp))
+            if (!state.canAddDestination) {
+                Text("Ya tenés ${GestureMap.MAX_DESTINATIONS} destinos (el máximo). Podés armar combos desde Ajustes.")
+                return@Column
+            }
+            if (state.canCreatePlaylists) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    OutlinedTextField(
+                        value = newName,
+                        onValueChange = { newName = it },
+                        label = { Text("Nueva playlist") },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f),
+                    )
+                    TextButton(onClick = { onCreate(newName) }, enabled = newName.isNotBlank()) { Text("Crear") }
+                }
+                Spacer(Modifier.height(8.dp))
+            }
+            LazyColumn(Modifier.heightIn(max = 360.dp)) {
+                items(state.addablePlaylists, key = { it.id.value }) { playlist ->
+                    ListItem(
+                        headlineContent = { Text(playlist.name) },
+                        modifier = Modifier.clickable { onPick(playlist) },
+                    )
+                }
+            }
         }
     }
 }

@@ -19,7 +19,7 @@ import com.slidedify.core.domain.gesture.GestureState
 import com.slidedify.core.domain.gesture.GestureStep
 import com.slidedify.core.domain.gesture.Point
 import com.slidedify.core.domain.gesture.PointerInput
-import com.slidedify.core.model.Slot
+import com.slidedify.core.domain.gesture.SectorLayout
 import kotlinx.coroutines.CancellationException
 
 /** Visual radius of the wheel; the activation radius is much smaller so gestures stay short. */
@@ -28,10 +28,10 @@ val WheelActivationRadius = 48.dp
 private val WheelResetRadius = 32.dp
 
 @Composable
-fun rememberGestureConfig(enabledSlots: Set<Slot>, holdTimeoutMs: Long, mirrored: Boolean): GestureConfig {
+fun rememberGestureConfig(destinationCount: Int, holdTimeoutMs: Long, mirrored: Boolean): GestureConfig {
     val density = LocalDensity.current
     val viewConfiguration = LocalViewConfiguration.current
-    return remember(density, viewConfiguration, enabledSlots, holdTimeoutMs, mirrored) {
+    return remember(density, viewConfiguration, destinationCount, holdTimeoutMs, mirrored) {
         with(density) {
             GestureConfig(
                 touchSlop = viewConfiguration.touchSlop,
@@ -40,8 +40,7 @@ fun rememberGestureConfig(enabledSlots: Set<Slot>, holdTimeoutMs: Long, mirrored
                 flingVelocity = 1_200.dp.toPx(),
                 wheelActivationRadius = WheelActivationRadius.toPx(),
                 wheelResetRadius = WheelResetRadius.toPx(),
-                enabledSlots = enabledSlots,
-                mirrored = mirrored,
+                layout = SectorLayout(destinationCount, mirrored),
             )
         }
     }

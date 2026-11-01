@@ -5,7 +5,6 @@ import com.slidedify.core.domain.settings.SortSettings
 import com.slidedify.core.model.GestureMap
 import com.slidedify.core.model.PlaylistId
 import com.slidedify.core.model.ProviderId
-import com.slidedify.core.model.Slot
 import org.junit.Test
 import kotlin.test.assertEquals
 
@@ -15,7 +14,7 @@ class SettingsMapperTest {
     fun `round trip keeps every field`() {
         val settings = SortSettings(
             gestureMaps = mapOf(
-                ProviderId("spotify") to GestureMap(mapOf(Slot.UP to setOf(PlaylistId("a"), PlaylistId("b")))),
+                ProviderId("spotify") to GestureMap(listOf(setOf(PlaylistId("a"), PlaylistId("b")), setOf(PlaylistId("c")))),
             ),
             holdTimeoutMs = 450,
             leftHanded = true,
@@ -34,10 +33,10 @@ class SettingsMapperTest {
     }
 
     @Test
-    fun `unknown slots and modes are ignored`() {
-        val raw = """{"gestureMaps":{"p":{"SIDEWAYS":["x"],"DOWN":["y"]}},"buttonMode":"Maybe","extra":1}"""
+    fun `old format, empty destinations and unknown modes are ignored`() {
+        val raw = """{"version":1,"gestureMaps":{"p":{"UP":["x"]}},"destinations":{"p":[[],["y"]]},"buttonMode":"Maybe","extra":1}"""
         val decoded = SettingsMapper.decode(raw)
-        assertEquals(GestureMap(mapOf(Slot.DOWN to setOf(PlaylistId("y")))), decoded.gestureMaps[ProviderId("p")])
+        assertEquals(GestureMap(listOf(setOf(PlaylistId("y")))), decoded.gestureMaps[ProviderId("p")])
         assertEquals(ButtonMode.Auto, decoded.buttonMode)
     }
 }

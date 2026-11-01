@@ -15,6 +15,8 @@ import kotlinx.coroutines.flow.StateFlow
 data class ProviderCapabilities(
     /** Has a "liked songs" collection that can be written (double tap). */
     val canLike: Boolean = true,
+    /** Can create new playlists from the app. */
+    val canCreatePlaylists: Boolean = true,
     /** Can play whole tracks on demand (some services only allow previews or need a paid plan). */
     val canPlayFullTracks: Boolean = true,
     /** Sources the user can pick when starting a session. */

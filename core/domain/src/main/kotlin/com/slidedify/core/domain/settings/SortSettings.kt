@@ -3,7 +3,6 @@ package com.slidedify.core.domain.settings
 import com.slidedify.core.model.GestureMap
 import com.slidedify.core.model.Playlist
 import com.slidedify.core.model.ProviderId
-import com.slidedify.core.model.Slot
 import kotlinx.coroutines.flow.Flow
 
 enum class ButtonMode {
@@ -25,10 +24,12 @@ data class SortSettings(
 ) {
     /**
      * Gesture map for [provider], keeping only playlists that still exist.
-     * Without a saved map, the first playlists are assigned in slot order.
+     * Without a saved map it starts with a single destination (the first playlist): half the
+     * circle for it, half for cancel. The user adds more from the main screen.
      */
     fun gestureMapFor(provider: ProviderId, playlists: List<Playlist>): GestureMap {
-        val saved = gestureMaps[provider] ?: return GestureMap.inOrder(playlists.take(Slot.entries.size))
+        val saved = gestureMaps[provider]
+            ?: return playlists.firstOrNull()?.let { GestureMap.of(it.id) } ?: GestureMap.Empty
         return saved.retainOnly(playlists.mapTo(mutableSetOf()) { it.id })
     }
 
