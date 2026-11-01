@@ -71,7 +71,7 @@ Login Spotify ─▶ Elegir fuente ─▶ Configurar gestos ─▶ Sesión de sw
 | Swipe → derecha | Playlist C |
 | Swipe ↘ abajo-derecha | Playlist D |
 | Swipe ↓ abajo | Playlist E |
-| Arrastrar sin soltar sobre los indicadores del costado derecho | Varias playlists a la vez (§3.3) |
+| Mantener presionado en cualquier lugar → rueda joystick | Una o varias playlists con gestos cortos (§3.3) |
 | Tap | Play / pausa |
 | Botón ↶ o sacudir | Deshacer última acción |
 
@@ -97,61 +97,93 @@ Sí son viables, pero **como modo avanzado opcional**, no por defecto.
 
 **Propuesta:**
 - **5 playlists por defecto:** ↑ ↗ → ↘ ↓. Solo se usan diagonales del **lado derecho** (lejos de "omitir"). Sectores de 60° + **zona muerta** de ±7° en cada frontera: si el ángulo cae ahí, la tarjeta vuelve al centro en vez de adivinar.
-- Si el swipe en diagonal resulta impreciso, el **riel de indicadores** (§3.3) es la alternativa exacta: llevar el dedo hasta el indicador elegido y soltar.
-- **Feedback mientras arrastra** (clave para que funcionen las diagonales): a medida que se arrastra, se resalta en el riel del costado derecho (§3.3) el indicador de la playlist destino con su color e ícono, + vibración háptica corta al cambiar de sector. Así el usuario corrige antes de soltar.
+- Si el swipe en diagonal resulta impreciso, la **rueda joystick** (§3.3) es la alternativa exacta: mantener presionado, empujar un poco hacia el sector y soltar.
+- **Feedback mientras arrastra** (clave para que funcionen las diagonales): a medida que se arrastra, aparece en el borde hacia donde se arrastra un indicador con el color, ícono y nombre de la playlist destino, + vibración háptica corta al cambiar de sector. Así el usuario corrige antes de soltar.
 - Umbral de distancia ≥ 30 % del ancho **o** velocidad (fling) ≥ umbral; si no, vuelve al centro.
-- Métrica para decidir con datos: registrar (localmente) los "deshacer" inmediatos por dirección. Si las diagonales tienen >2× la tasa de deshacer de las cardinales, la UI sugiere usar el riel de indicadores en lugar del swipe en diagonal.
+- Métrica para decidir con datos: registrar (localmente) los "deshacer" inmediatos por dirección. Si las diagonales tienen >2× la tasa de deshacer de las cardinales, la UI sugiere usar la rueda joystick para esas playlists.
 
-**Para más de 5 playlists:** se usan combos (§3.3) o se cambia el set de playlists entre sesiones. Mantener presionado queda reservado para el riel, así que no hay menú radial.
+**Para más de 5 playlists:** se usan combos (§3.3) o se cambia el set de playlists entre sesiones. La rueda tiene 5 sectores de playlist para que cada uno sea grande y fácil de acertar con el pulgar.
 
-### 3.3 Asignar a varias playlists a la vez — Riel de indicadores
+### 3.3 Asignar a una o varias playlists — Rueda joystick
 
-**Idea:** en el costado derecho hay un **riel vertical con 5 indicadores**, uno por playlist, ordenados igual que las direcciones (↑ arriba, ↗, →, ↘, ↓ abajo). Mientras el dedo **no se levanta**, el usuario va tocando 2 o más indicadores; **al levantar el dedo** la canción se agrega a todas las playlists marcadas. Mientras mantiene el dedo, aparece un botón **Cancelar** por si se confundió.
+**Idea:** pensado para usar con **una sola mano**. Al **mantener presionado en cualquier parte** de la pantalla aparece una **rueda centrada en el dedo**. Funciona como el joystick de una consola: con movimientos cortos del pulgar (~1 cm) se eligen playlists, sin tener que estirarse a un borde de la pantalla.
 
 ```
-┌──────────────────────────────────┐
-│                           ┌────┐ │
-│                           │ ↑  │ │  A · Gym      ✓ (marcado)
-│      ┌────────┐           │ ↗  │ │  B · Chill
-│      │ mini   │  ✓Gym     │ →  │ │  C · Focus    ✓ (marcado)
-│      │ portada│  ✓Focus   │ ↘  │ │  D · Party
-│      └────────┘     ●←dedo│ ↓  │ │  E · Running
-│                           └────┘ │
-│ ┌──────────┐                     │
-│ │✕ Cancelar│  ← aparece solo     │
-│ └──────────┘    mientras se mantiene el dedo
-└──────────────────────────────────┘
+              mantener presionado ~300 ms donde sea
+                            │
+                            ▼
+                   ┌──── A · Gym ────┐
+                  /    ↑   (45°)       \
+                 /   ╲             ╱  B · Chill ↗
+          ┌────┐    ╲  ┌─────┐  ╱
+          │ ✕  │  ←    │  ●  │    →  C · Focus ✓
+          │Can-│    ╱  │dedo │  ╲
+          │celar    ╱  └─────┘    ╲  D · Party ↘
+                 \                  /
+                  \    ↓           /
+                   └── E · Running ─┘
+
+   radio visible ≈ 90 dp · basta empujar ≈ 48 dp para activar un sector
 ```
+
+**Sectores** (medidos desde el punto donde se apoyó el dedo):
+
+| Sector | Ángulo | Destino |
+|---|---|---|
+| ↑ | 67,5° – 112,5° | Playlist A |
+| ↗ | 22,5° – 67,5° | Playlist B |
+| → | −22,5° – 22,5° | Playlist C |
+| ↘ | −67,5° – −22,5° | Playlist D |
+| ↓ | −112,5° – −67,5° | Playlist E |
+| ← (toda la mitad izquierda, 135°) | 112,5° – 247,5° | **✕ Cancelar** |
+
+Las 5 playlists ocupan la mitad derecha, igual que los swipes, así se aprende un solo mapa mental. Toda la mitad izquierda es **Cancelar**: es enorme y "izquierda = no", igual que omitir. Entre sectores hay ±5° de zona muerta.
 
 **Reglas del gesto:**
 
-1. **Arrastre normal:** la tarjeta sigue al dedo. Si el usuario suelta sin haber marcado ningún indicador, se comporta como swipe simple (§3.2): se calcula la dirección, o vuelve al centro.
-2. **Marcar un indicador:** el dedo tiene que **quedarse ~150 ms** sobre el indicador. Se llena un anillo de progreso, hay vibración corta y aparece un ✓. Esta pequeña espera es clave: para ir de ↑ a ↓ el dedo pasa por encima de ↗ → ↘. Sin la espera, esos se marcarían por error. Por la misma razón, un swipe rápido hacia la derecha que cruza el riel no marca nada.
-3. **Desmarcar:** quedarse otra vez ~150 ms sobre un indicador ya marcado lo desmarca.
-4. **Mientras hay marcas:** la tarjeta se achica a una mini portada que sigue al dedo, con las playlists marcadas apiladas como etiquetas ("✓ Gym · ✓ Focus").
-5. **Levantar el dedo** en cualquier lugar (salvo sobre Cancelar) → se agrega a **todas** las marcadas. Con una sola marcada, se agrega solo a esa: sirve como alternativa precisa a los swipes en diagonal.
-6. **Cancelar:** el botón **✕ Cancelar** aparece abajo a la izquierda (lejos del riel) en cuanto se marca el primer indicador, o al mantener el dedo quieto ≥ 400 ms. Si se suelta sobre él, se descarta todo y la tarjeta vuelve al centro. Es grande (≥ 88 dp) y vibra al entrar. Los swipes rápidos nunca lo ven, así que no interfiere con "omitir".
-7. **Zonas táctiles:** cada indicador mide ≥ 56 dp de alto, con 8 dp de separación. Para que cuente como "adentro", el dedo tiene que entrar al menos 8 dp (histéresis), así el temblor en el borde no marca y desmarca solo.
+1. **Abrir:** mantener el dedo quieto ~300 ms (movimiento < 8 dp) → vibración + aparece la rueda en esa posición con los colores, íconos y nombres de las 5 playlists. La tarjeta se atenúa y queda quieta. El tiempo es ajustable (200–500 ms) para usuarios expertos.
+2. **Marcar (empujar y volver):** empujar el dedo hacia un sector más allá del **radio de activación (~48 dp)** marca o desmarca esa playlist (✓ + vibración). Para marcar otra, el pulgar **vuelve hacia el centro** (dentro de ~32 dp) y empuja hacia el siguiente sector. Igual que mover un joystick y soltarlo. Ventajas:
+   - Gestos de ~1 cm, cómodos con el pulgar.
+   - Ir de ↑ a ↓ pasando por el centro **no marca** los sectores del medio, porque solo cuenta cruzar el radio hacia afuera.
+   - La diferencia entre 48 y 32 dp (histéresis) evita marcas dobles por temblor.
+3. **Moverse por afuera del círculo** de un sector a otro sin volver al centro **no marca** nada nuevo. Solo resalta el sector que está bajo el dedo, por si el usuario quiere soltar ahí.
+4. **Soltar = confirmar:** al levantar el dedo se agrega la canción a **todas las playlists marcadas**.
+   - Uso rápido para una sola playlist: mantener → empujar hacia ↗ → soltar. Se agrega solo a B.
+   - Si no hay nada marcado y se suelta en el centro, la rueda se cierra sin hacer nada.
+5. **Cancelar:** soltar con el dedo en la mitad izquierda (sector ✕) descarta todo, aunque haya marcas. Al entrar al sector ✕ vibra distinto y el sector se pone rojo, para que el usuario sepa que va a cancelar.
+6. **Feedback continuo:** las playlists marcadas se muestran apiladas en el centro de la rueda ("✓ Gym · ✓ Focus") y el sector bajo el dedo se ilumina.
+7. **Bordes de pantalla:** si el dedo está cerca de un borde, la rueda se **dibuja corrida** para que entre completa. Pero los gestos se siguen midiendo **desde el punto donde se apoyó el dedo**, así que el movimiento es el mismo en cualquier lugar.
 
-**Estados (máquina de estados, función pura y testeable):**
+**Estados (reductor puro, testeable sin emulador):**
 
 ```
-Idle ──down──▶ Pressing ──move > slop──▶ Dragging
-                  │ hold ≥400ms               │ dwell 150ms en indicador
-                  ▼                           ▼
-              Holding(cancel visible) ◀──▶ MultiSelect(selected: Set, cancel visible)
-                                              │
-   up sin marcas → clasificar swipe (§3.2)    │ up sobre Cancelar → Idle (sin cambios)
-                                              │ up en otro lugar → Commit(selected) → Idle
+Idle ─down─▶ Pressing ─move > 8dp─▶ Swiping (swipe simple, §3.2)
+                │
+                │ quieto ≥ 300 ms
+                ▼
+           Wheel(origin, selected = {}, armed = true)
+             │ r > 48dp en sector P y armed  → toggle(P), armed = false
+             │ r < 32dp                      → armed = true
+             │ up en sector ✕                → Cancel → Idle
+             │ up en otro lugar              → Commit(selected) → Idle  (vacío = no hace nada)
 ```
+
+**Convivencia con los otros gestos:**
+
+| Gesto | Cómo se distingue |
+|---|---|
+| Tap (play/pausa) | Toque corto, sin movimiento |
+| Doble tap (Me gusta) | Dos toques cortos |
+| Swipe simple | El dedo se mueve > 8 dp **antes** de los 300 ms |
+| Rueda | El dedo se queda quieto ≥ 300 ms |
 
 **Detalles:**
-- **Zurdos:** un ajuste refleja la pantalla (riel a la izquierda, omitir con swipe a la derecha, Cancelar abajo a la derecha).
-- **Descubrimiento:** el riel está siempre visible pero discreto (íconos de 50 % de opacidad). Mientras se arrastra se agranda y muestra los nombres. La primera vez, un tutorial interactivo de 3 pasos.
-- **Combos (complemento):** en la configuración una dirección también puede apuntar a un grupo, p. ej. ↑ = "Gym + Running", para las combinaciones que se repiten mucho.
-- **Accesibilidad:** en el "modo botones" el riel se vuelve una lista de casillas que se tocan y un botón "Agregar".
+- **Ambas manos:** la rueda aparece donde está el pulgar, sirve igual para diestros y zurdos. Un ajuste opcional refleja el mapa (playlists a la izquierda, Cancelar a la derecha).
+- **Aprendizaje:** las primeras veces la rueda muestra los nombres completos. Con el uso, una opción la deja solo con íconos y colores, más compacta. Tutorial interactivo de 3 pasos al inicio.
+- **Combos:** en la configuración un sector o un swipe también puede apuntar a un grupo, p. ej. ↑ = "Gym + Running".
+- **Accesibilidad:** con TalkBack o en "modo botones" la rueda se reemplaza por una lista de casillas y un botón "Agregar".
 
-**Alternativas evaluadas y descartadas:** botones de playlist abajo de la tarjeta (un toque extra por playlist y ocupan espacio), swipe con 2 dedos (difícil de descubrir) y menú radial multi-selección (lento).
+**Alternativas descartadas:** riel fijo en el costado (obliga a estirar el pulgar a un borde), botones de playlist debajo de la tarjeta (un toque extra por playlist), swipe con 2 dedos (difícil de descubrir).
 
 ### 3.4 Tras cada acción
 - Animación de salida hacia la dirección + toast breve "Agregada a **Gym**" con botón **Deshacer** (5 s).
@@ -168,13 +200,13 @@ Idle ──down──▶ Pressing ──move > slop──▶ Dragging
 ┌──────────────────────────────────┐
 │ ←  Ordenando: "Liked Songs"  12/430│  barra superior + progreso
 │                        ↶   ⚙      │
-│      ┌──────────────┐      ┌──┐ │
-│      │              │      │↑ │ │  riel de indicadores (§3.3):
-│      │   PORTADA    │      │↗ │ │  color + ícono de cada playlist.
-│ skip │   (album)    │      │→ │ │  Se ilumina el destino al
-│      │              │      │↘ │ │  arrastrar; se agranda y muestra
-│      └──────────────┘      │↓ │ │  nombres mientras el dedo está abajo
-│                            └──┘ │
+│      ┌──────────────┐           │
+│      │              │           │  mantener presionado en
+│      │   PORTADA    │           │  cualquier lugar → rueda
+│ skip │   (album)    │           │  joystick centrada en el
+│      │              │           │  dedo (§3.3)
+│      └──────────────┘           │
+│                                 │
 │   Título de la canción     ❤      │
 │   Artista · Álbum · 2019          │
 │   ▶ ━━━━━━━━━○───── 1:12 / 3:40   │  progreso (seek)
@@ -195,7 +227,7 @@ Idle ──down──▶ Pressing ──move > slop──▶ Dragging
 ### 4.2 Otras pantallas
 1. **Onboarding / Login:** explica qué hace la app, pide permisos de Spotify, verifica que la app de Spotify esté instalada y si la cuenta es Premium.
 2. **Elegir fuente:** tabs Playlists / Me gusta / Recomendadas.
-3. **Configurar gestos:** diagrama interactivo tipo brújula; tocar una dirección → elegir playlist existente, crear nueva, u "omitir", o combo. Elegir combos y modo zurdo. Vista previa para practicar el riel y los swipes.
+3. **Configurar gestos:** diagrama interactivo tipo brújula; tocar una dirección → elegir playlist existente, crear nueva, u "omitir", o combo. Elegir combos y modo zurdo. Ajustar el tiempo para abrir la rueda. Vista previa para practicar la rueda y los swipes.
 4. **Resumen de sesión:** conteos por playlist, lista de acciones, deshacer individual.
 5. **Ajustes:** autoplay on/off, empezar canción desde el estribillo (saltar a 30 %, opcional), háptica, quitar de origen, modo botones.
 
@@ -266,7 +298,7 @@ data class SwipeUiState(
     val current: TrackCard?,
     val upcoming: List<TrackCard>,       // 2–3 precargadas
     val gestureMap: GestureMap,
-    val drag: DragState,                 // Idle | Dragging | Holding | MultiSelect(selected, cancelVisible)
+    val gesture: GestureState,           // Idle | Pressing | Swiping | Wheel(origin, selected, armed, hovered)
     val player: PlayerState,
     val lyrics: LyricsState,
     val pendingSync: Int,
@@ -278,7 +310,7 @@ sealed interface SwipeIntent {
     data object Undo : SwipeIntent
 }
 ```
-El ViewModel expone `StateFlow<SwipeUiState>` y recibe `SwipeIntent`; la detección de gestos (Compose `pointerInput` + `Animatable`) traduce eventos crudos a `Direction` mediante una función pura `classify(dx, dy, velocity, mode): Direction?`. El riel de multi-selección es un reductor puro `reduce(DragState, PointerEvent(x, y, t, type)): DragState` que no depende de Compose; la UI solo le pasa los eventos del puntero y las posiciones de los indicadores. Ambos se testean sin emulador.
+El ViewModel expone `StateFlow<SwipeUiState>` y recibe `SwipeIntent`; la detección de gestos (Compose `pointerInput` + `Animatable`) traduce eventos crudos a `Direction` mediante una función pura `classify(dx, dy, velocity, mode): Direction?`. La rueda es un reductor puro `reduce(GestureState, PointerEvent(x, y, t, type)): GestureState` que no depende de Compose; la UI solo le pasa los eventos del puntero y dibuja el estado. Ambos se testean sin emulador.
 
 ---
 
@@ -316,7 +348,7 @@ El ViewModel expone `StateFlow<SwipeUiState>` y recibe `SwipeIntent`; la detecci
 - **Rendimiento:** precarga de 2–3 tarjetas, imágenes con tamaño exacto, Baseline Profiles, R8 en release.
 - **Privacidad:** el historial de acciones se guarda solo en el dispositivo; política de privacidad clara (requisito de Spotify y Play Store).
 - **Git:** trunk-based, PRs chicos, Conventional Commits, CI obligatoria para mergear.
-- **Tests prioritarios:** `classify()` de gestos (tabla de ángulos), reductor del riel (pasar por encima sin marcar, espera, desmarcar, cancelar, soltar), outbox/sync (lotes, 429, deshacer), mapeo de DTOs, ViewModel del swipe.
+- **Tests prioritarios:** `classify()` de gestos (tabla de ángulos), reductor de la rueda (abrir por tiempo, empujar y volver, pasar por el centro sin marcar, desmarcar, cancelar, soltar, rueda corrida en bordes), outbox/sync (lotes, 429, deshacer), mapeo de DTOs, ViewModel del swipe.
 
 ---
 
@@ -327,7 +359,7 @@ El ViewModel expone `StateFlow<SwipeUiState>` y recibe `SwipeIntent`; la detecci
 | **0 · Setup** (1 sem) | Proyecto multi-módulo, CI, design system base, registro app en Spotify Dashboard |
 | **1 · MVP** (3–4 sem) | Login PKCE, elegir playlist/Me gusta, swipe 5 direcciones + doble tap, autoplay, outbox + sync, deshacer |
 | **2 · Riqueza** (2 sem) | Letras sincronizadas, hoja de detalle de artista/álbum, color dinámico, resumen de sesión |
-| **3 · Avanzado** (2 sem) | Riel de multi-selección con Cancelar, combos, modo zurdo, recomendadas |
+| **3 · Avanzado** (2 sem) | Rueda joystick con multi-selección y Cancelar, combos, recomendadas |
 | **4 · Pulido** | Accesibilidad, Baseline Profiles, screenshot tests, beta cerrada (≤ 5 usuarios) |
 
 ---
