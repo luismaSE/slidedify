@@ -72,6 +72,10 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        api: [34, 36]
     steps:
       - uses: actions/checkout@v5
 
@@ -89,7 +93,7 @@ jobs:
       - name: Launch on emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 34
+          api-level: ${{ matrix.api }}
           arch: x86_64
           target: google_apis
           disable-animations: true
@@ -98,7 +102,7 @@ jobs:
       - uses: actions/upload-artifact@v5
         if: always()
         with:
-          name: smoke-logs
+          name: smoke-logs-${{ matrix.api }}
           path: |
             logcat.txt
             smoke-screen.png

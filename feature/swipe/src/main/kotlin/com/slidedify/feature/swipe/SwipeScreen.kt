@@ -91,9 +91,11 @@ import com.slidedify.core.model.GestureMap
 import com.slidedify.core.model.Playlist
 import com.slidedify.core.model.Slot
 import com.slidedify.core.model.Track
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.sin
@@ -464,6 +466,7 @@ private fun TrackCard(
         ) {
             if (track.album.imageUrl != null) {
                 val context = LocalContext.current
+                val scope = rememberCoroutineScope()
                 val request = remember(track.album.imageUrl) {
                     // Software bitmap so its colours can be read for the background tint.
                     ImageRequest.Builder(context).data(track.album.imageUrl).allowHardware(false).build()
@@ -474,8 +477,15 @@ private fun TrackCard(
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize(),
                     onSuccess = { success ->
-                        Palette.from(success.result.image.toBitmap()).generate { palette ->
-                            val rgb = palette?.vibrantSwatch?.rgb ?: palette?.dominantSwatch?.rgb
+                        val image = success.result.image
+                        scope.launch {
+                            // Purely cosmetic: any failure just leaves the plain background.
+                            val rgb = withContext(Dispatchers.Default) {
+                                runCatching {
+                                    val palette = Palette.from(image.toBitmap()).generate()
+                                    palette.vibrantSwatch?.rgb ?: palette.dominantSwatch?.rgb
+                                }.getOrNull()
+                            }
                             onCoverColor(rgb?.let(::Color))
                         }
                     },
