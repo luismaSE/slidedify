@@ -1,6 +1,7 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt)
 }
@@ -38,7 +39,12 @@ android {
 dependencies {
     implementation(project(":core:domain"))
     implementation(project(":core:designsystem"))
+    implementation(project(":core:datastore"))
+    implementation(project(":core:data"))
+    implementation(project(":lyrics:lrclib"))
+    implementation(project(":feature:source"))
     implementation(project(":feature:swipe"))
+    implementation(project(":feature:settings"))
 
     // Providers bundled in this build. Adding one = one line here + its own module.
     implementation(project(":provider:fake"))
@@ -47,6 +53,9 @@ dependencies {
     implementation(libs.androidx.activity.compose)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)
+    implementation(libs.androidx.compose.material3)
+    implementation(libs.androidx.navigation.compose)
+    implementation(libs.kotlinx.serialization.json)
     debugImplementation(libs.androidx.compose.ui.tooling)
 
     implementation(libs.hilt.android)

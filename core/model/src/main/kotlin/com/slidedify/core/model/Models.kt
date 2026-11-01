@@ -67,6 +67,12 @@ data class GestureMap(
 
     fun playlistsFor(slots: Set<Slot>): Set<PlaylistId> = slots.flatMapTo(linkedSetOf()) { targets[it].orEmpty() }
 
+    /** Assigns [playlists] to [slot] (several = combo, empty = disabled). */
+    fun withSlot(slot: Slot, playlists: Set<PlaylistId>): GestureMap = GestureMap(targets + (slot to playlists))
+
+    /** Drops playlists that no longer exist (deleted or no longer writable). */
+    fun retainOnly(existing: Set<PlaylistId>): GestureMap = GestureMap(targets.mapValues { (_, ids) -> ids intersect existing })
+
     companion object {
         /** Assigns playlists to slots in order: UP, UP_RIGHT, RIGHT, DOWN_RIGHT, DOWN. */
         fun inOrder(playlists: List<Playlist>): GestureMap =

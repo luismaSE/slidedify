@@ -27,10 +27,15 @@ include(":app")
 // Pure Kotlin: no Android dependency, unit-tested on the JVM.
 include(":core:model")
 include(":core:domain")
+include(":lyrics:lrclib")
 
 // Android libraries.
 include(":core:designsystem")
+include(":core:datastore")
+include(":core:data")
+include(":feature:source")
 include(":feature:swipe")
+include(":feature:settings")
 
 // Music providers. Each one implements MusicProvider and registers itself via Hilt.
 include(":provider:fake")

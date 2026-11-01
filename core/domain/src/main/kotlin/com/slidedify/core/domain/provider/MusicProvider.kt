@@ -1,7 +1,7 @@
 package com.slidedify.core.domain.provider
 
+import com.slidedify.core.domain.outbox.LibraryWriter
 import com.slidedify.core.domain.player.Player
-import com.slidedify.core.domain.repository.LibraryRepository
 import com.slidedify.core.domain.repository.PlaylistRepository
 import com.slidedify.core.domain.repository.TrackRepository
 import com.slidedify.core.domain.repository.TrackSource
@@ -54,6 +54,8 @@ interface MusicProvider {
     val auth: ProviderAuth
     val tracks: TrackRepository
     val playlists: PlaylistRepository
-    val library: LibraryRepository
+
+    /** Remote writes. Called only by the outbox sync, never directly by features. */
+    val writer: LibraryWriter
     val player: Player
 }

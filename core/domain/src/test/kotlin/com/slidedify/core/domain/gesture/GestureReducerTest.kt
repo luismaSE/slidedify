@@ -199,4 +199,26 @@ class GestureReducerTest {
         assertEquals(GestureState.Idle, steps.last().state)
         assertNull(steps.last().outcome)
     }
+
+    // --- Left-handed (mirrored) -----------------------------------------------------------------
+
+    @Test
+    fun `mirrored swipe to the right skips and to the left reaches RIGHT slot`() {
+        val mirrored = GestureReducer(config.copy(mirrored = true))
+        assertEquals(SwipeResult.Skip, mirrored.classifySwipe(Point(400f, 0f), Point.Zero))
+        assertEquals(SwipeResult.ToSlot(Slot.RIGHT), mirrored.classifySwipe(Point(-400f, 0f), Point.Zero))
+        assertEquals(SwipeResult.ToSlot(Slot.UP_RIGHT), mirrored.classifySwipe(Point(-300f, -300f), Point.Zero))
+        assertEquals(SwipeResult.ToSlot(Slot.UP), mirrored.classifySwipe(Point(0f, -400f), Point.Zero))
+    }
+
+    @Test
+    fun `mirrored wheel cancels on the right half`() {
+        val mirrored = GestureReducer(config.copy(mirrored = true))
+        var state: GestureState = wheelState()
+        var last: GestureStep? = null
+        listOf(moveBy(left), moveBy(center), moveBy(right), upBy(right)).forEach { input ->
+            last = mirrored.reduce(state, input).also { state = it.state }
+        }
+        assertEquals(GestureOutcome.WheelCancelled, last?.outcome)
+    }
 }

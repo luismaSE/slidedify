@@ -28,19 +28,20 @@ val WheelActivationRadius = 48.dp
 private val WheelResetRadius = 32.dp
 
 @Composable
-fun rememberGestureConfig(enabledSlots: Set<Slot>): GestureConfig {
+fun rememberGestureConfig(enabledSlots: Set<Slot>, holdTimeoutMs: Long, mirrored: Boolean): GestureConfig {
     val density = LocalDensity.current
     val viewConfiguration = LocalViewConfiguration.current
-    return remember(density, viewConfiguration, enabledSlots) {
+    return remember(density, viewConfiguration, enabledSlots, holdTimeoutMs, mirrored) {
         with(density) {
             GestureConfig(
                 touchSlop = viewConfiguration.touchSlop,
-                holdTimeoutMs = 300,
+                holdTimeoutMs = holdTimeoutMs,
                 swipeDistance = 120.dp.toPx(),
                 flingVelocity = 1_200.dp.toPx(),
                 wheelActivationRadius = WheelActivationRadius.toPx(),
                 wheelResetRadius = WheelResetRadius.toPx(),
                 enabledSlots = enabledSlots,
+                mirrored = mirrored,
             )
         }
     }

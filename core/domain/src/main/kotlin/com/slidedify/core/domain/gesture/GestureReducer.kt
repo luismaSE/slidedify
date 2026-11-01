@@ -19,6 +19,8 @@ data class GestureConfig(
     val deadZoneDegrees: Float = 5f,
     /** Slots that have playlists assigned; the others cannot be selected. */
     val enabledSlots: Set<Slot> = Slot.entries.toSet(),
+    /** Left-handed mode: playlists on the left half, skip/cancel on the right. */
+    val mirrored: Boolean = false,
 ) {
     init {
         require(wheelResetRadius < wheelActivationRadius) { "Reset radius must be smaller than activation radius" }
@@ -144,7 +146,7 @@ class GestureReducer(private val config: GestureConfig) {
         val vector = position - state.origin
         val radius = vector.length
         val outside = radius >= config.wheelActivationRadius
-        val sector = if (outside) SectorLayout.sectorOf(vector, config.deadZoneDegrees) else null
+        val sector = if (outside) SectorLayout.sectorOf(vector, config.deadZoneDegrees, config.mirrored) else null
 
         var selected = state.selected
         var armed = state.armed
@@ -183,7 +185,7 @@ class GestureReducer(private val config: GestureConfig) {
         is GestureState.Wheel -> {
             val vector = input.position - state.origin
             val releasedOnCancel = vector.length >= config.wheelActivationRadius &&
-                SectorLayout.sectorOf(vector, config.deadZoneDegrees) == Sector.Left
+                SectorLayout.sectorOf(vector, config.deadZoneDegrees, config.mirrored) == Sector.Left
             val outcome = when {
                 releasedOnCancel -> GestureOutcome.WheelCancelled
                 state.selected.isEmpty() -> GestureOutcome.WheelDismissed
@@ -205,7 +207,7 @@ class GestureReducer(private val config: GestureConfig) {
             velocity.length >= config.flingVelocity -> velocity
             else -> return null
         }
-        return when (val sector = SectorLayout.sectorOf(direction, config.deadZoneDegrees)) {
+        return when (val sector = SectorLayout.sectorOf(direction, config.deadZoneDegrees, config.mirrored)) {
             Sector.Left -> SwipeResult.Skip
             is Sector.Destination -> if (sector.slot in config.enabledSlots) SwipeResult.ToSlot(sector.slot) else null
             null -> null

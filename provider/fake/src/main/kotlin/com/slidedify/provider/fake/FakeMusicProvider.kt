@@ -1,17 +1,16 @@
 package com.slidedify.provider.fake
 
 import android.util.Log
+import com.slidedify.core.domain.outbox.LibraryWriter
 import com.slidedify.core.domain.player.Player
 import com.slidedify.core.domain.player.PlayerState
 import com.slidedify.core.domain.provider.AuthState
 import com.slidedify.core.domain.provider.MusicProvider
 import com.slidedify.core.domain.provider.ProviderAuth
 import com.slidedify.core.domain.provider.ProviderCapabilities
-import com.slidedify.core.domain.repository.LibraryRepository
 import com.slidedify.core.domain.repository.PlaylistRepository
 import com.slidedify.core.domain.repository.TrackRepository
 import com.slidedify.core.domain.repository.TrackSource
-import com.slidedify.core.domain.session.LibraryEffect
 import com.slidedify.core.model.Album
 import com.slidedify.core.model.Artist
 import com.slidedify.core.model.Playlist
@@ -41,7 +40,7 @@ import javax.inject.Singleton
 class FakeMusicProvider @Inject constructor(
     override val tracks: FakeTrackRepository,
     override val playlists: FakePlaylistRepository,
-    override val library: InMemoryLibraryRepository,
+    override val writer: FakeLibraryWriter,
     override val player: FakePlayer,
 ) : MusicProvider {
     override val id = ID
@@ -68,7 +67,12 @@ internal object FakeCatalog {
         Playlist(PlaylistId("running"), FakeMusicProvider.ID, "Running"),
     )
 
+    // A few real songs so LRCLIB can show lyrics in the demo; the rest are invented.
     private val rows = listOf(
+        Triple("Bohemian Rhapsody", "Queen", "A Night at the Opera" to 1975),
+        Triple("Take On Me", "a-ha", "Hunting High and Low" to 1985),
+        Triple("Billie Jean", "Michael Jackson", "Thriller" to 1982),
+        Triple("Smells Like Teen Spirit", "Nirvana", "Nevermind" to 1991),
         Triple("Neon Skies", "The Midnight Owls", "Afterglow" to 2019),
         Triple("Paper Planes Over Lima", "Costa Azul", "Litoral" to 2021),
         Triple("Slow Orbit", "Lunar Tides", "Gravity Wells" to 2018),
@@ -83,6 +87,8 @@ internal object FakeCatalog {
         Triple("Hojas de Otoño", "Valle Norte", "Estaciones" to 2014),
     )
 
+    private val realDurations = listOf(355_000L, 225_000L, 294_000L, 301_000L)
+
     val tracks: List<Track> = rows.mapIndexed { index, (title, artist, album) ->
         Track(
             id = TrackId("fake$index"),
@@ -90,14 +96,21 @@ internal object FakeCatalog {
             title = title,
             artists = listOf(Artist("artist$index", artist)),
             album = Album("album$index", album.first, imageUrl = null, releaseYear = album.second),
-            durationMs = 150_000L + index * 13_000L,
+            durationMs = realDurations.getOrElse(index) { 150_000L + index * 13_000L },
         )
     }
 }
 
 @Singleton
 class FakeTrackRepository @Inject constructor() : TrackRepository {
-    override suspend fun tracks(source: TrackSource): List<Track> = FakeCatalog.tracks
+    override suspend fun tracks(source: TrackSource): List<Track> = when (source) {
+        TrackSource.LikedSongs, TrackSource.Recommended -> FakeCatalog.tracks
+        // Each demo playlist gets a stable subset of the catalog.
+        is TrackSource.FromPlaylist -> {
+            val offset = FakeCatalog.playlists.indexOfFirst { it.id == source.id }.coerceAtLeast(0)
+            FakeCatalog.tracks.filterIndexed { index, _ -> (index + offset) % 3 != 0 }
+        }
+    }
 }
 
 @Singleton
@@ -105,15 +118,19 @@ class FakePlaylistRepository @Inject constructor() : PlaylistRepository {
     override suspend fun writablePlaylists(): List<Playlist> = FakeCatalog.playlists
 }
 
-/** Logs effects instead of calling Spotify. */
+/** Pretends to call a remote API (with latency) and logs the writes. */
 @Singleton
-class InMemoryLibraryRepository @Inject constructor() : LibraryRepository {
-    private val _applied = MutableStateFlow<List<LibraryEffect>>(emptyList())
-    val applied: StateFlow<List<LibraryEffect>> = _applied.asStateFlow()
+class FakeLibraryWriter @Inject constructor() : LibraryWriter {
+    override suspend fun addToPlaylist(playlist: PlaylistId, tracks: List<TrackId>) = fakeCall("add $tracks to $playlist")
 
-    override suspend fun apply(effect: LibraryEffect) {
-        Log.d("Slidedify", "Library effect: $effect")
-        _applied.update { it + effect }
+    override suspend fun removeFromPlaylist(playlist: PlaylistId, tracks: List<TrackId>) =
+        fakeCall("remove $tracks from $playlist")
+
+    override suspend fun setLiked(tracks: List<TrackId>, liked: Boolean) = fakeCall("liked=$liked $tracks")
+
+    private suspend fun fakeCall(description: String) {
+        delay(300)
+        Log.d("Slidedify", "Demo provider write: $description")
     }
 }
 

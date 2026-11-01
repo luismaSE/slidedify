@@ -52,4 +52,13 @@ class SectorLayoutTest {
     fun `zero vector has no sector`() {
         assertNull(SectorLayout.sectorOf(Point.Zero, deadZoneDegrees = 5f))
     }
+
+    @Test
+    fun `display angle mirrors horizontally`() {
+        assertEquals(180f, SectorLayout.displayAngle(0f, mirrored = true), 0.001f)
+        assertEquals(135f, SectorLayout.displayAngle(45f, mirrored = true), 0.001f)
+        assertEquals(90f, SectorLayout.displayAngle(90f, mirrored = true), 0.001f)
+        assertEquals(225f, SectorLayout.displayAngle(315f, mirrored = true), 0.001f)
+        assertEquals(45f, SectorLayout.displayAngle(45f, mirrored = false), 0.001f)
+    }
 }

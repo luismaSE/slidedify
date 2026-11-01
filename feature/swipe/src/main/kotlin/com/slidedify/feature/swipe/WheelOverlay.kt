@@ -19,7 +19,6 @@ import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.slidedify.core.designsystem.CancelColor
-import com.slidedify.core.designsystem.arrow
 import com.slidedify.core.designsystem.color
 import com.slidedify.core.domain.gesture.GestureState
 import com.slidedify.core.domain.gesture.Sector
@@ -33,7 +32,12 @@ import kotlin.math.sin
  * math angle `a` (counter-clockwise, 0° = right) becomes `-a` here.
  */
 @Composable
-fun WheelOverlay(wheel: GestureState.Wheel, targets: Map<Slot, SlotTarget>, modifier: Modifier = Modifier) {
+fun WheelOverlay(
+    wheel: GestureState.Wheel,
+    targets: Map<Slot, SlotTarget>,
+    mirrored: Boolean,
+    modifier: Modifier = Modifier,
+) {
     val textMeasurer = rememberTextMeasurer()
     Canvas(modifier) {
         val radius = WheelRadius.toPx()
@@ -52,13 +56,14 @@ fun WheelOverlay(wheel: GestureState.Wheel, targets: Map<Slot, SlotTarget>, modi
                 enabled -> 0.22f
                 else -> 0.05f
             }
-            drawSector(center, radius, slot.centerDegrees, SectorLayout.SLOT_HALF_WIDTH, slot.color().copy(alpha))
+            val angle = SectorLayout.displayAngle(slot.centerDegrees, mirrored)
+            drawSector(center, radius, angle, SectorLayout.SLOT_HALF_WIDTH, slot.color().copy(alpha))
         }
         val cancelHovered = wheel.hovered == Sector.Left
         drawSector(
             center,
             radius,
-            centerDegrees = 180f,
+            centerDegrees = SectorLayout.displayAngle(180f, mirrored),
             halfWidth = (SectorLayout.LEFT_END - SectorLayout.LEFT_START) / 2f,
             color = CancelColor.copy(alpha = if (cancelHovered) 0.75f else 0.18f),
         )
@@ -70,9 +75,10 @@ fun WheelOverlay(wheel: GestureState.Wheel, targets: Map<Slot, SlotTarget>, modi
         Slot.entries.forEach { slot ->
             val target = targets[slot] ?: return@forEach
             val check = if (slot in wheel.selected) "✓ " else ""
-            drawLabel(textMeasurer, "$check${slot.arrow()}\n${target.label}", center, radius * 0.7f, slot.centerDegrees)
+            val angle = SectorLayout.displayAngle(slot.centerDegrees, mirrored)
+            drawLabel(textMeasurer, "$check${target.label}", center, radius * 0.7f, angle)
         }
-        drawLabel(textMeasurer, "✕\nCancelar", center, radius * 0.66f, 180f)
+        drawLabel(textMeasurer, "✕\nCancelar", center, radius * 0.66f, SectorLayout.displayAngle(180f, mirrored))
 
         val count = wheel.selected.size
         drawLabel(textMeasurer, if (count == 0) "empujá\nel pulgar" else "✓ $count", center, 0f, 0f, small = count == 0)

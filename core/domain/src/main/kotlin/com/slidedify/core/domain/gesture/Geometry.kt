@@ -45,15 +45,20 @@ object SectorLayout {
     /**
      * Sector for a vector, or `null` when the angle falls within [deadZoneDegrees] of a boundary
      * (ambiguous gesture: better to do nothing than guess wrong) or the vector has no length.
+     * With [mirrored] (left-handed mode) the layout is flipped horizontally: slots on the left, skip/cancel on the right.
      */
-    fun sectorOf(vector: Point, deadZoneDegrees: Float): Sector? {
+    fun sectorOf(vector: Point, deadZoneDegrees: Float, mirrored: Boolean = false): Sector? {
         if (vector.length == 0f) return null
-        val angle = angleOf(vector)
+        val angle = angleOf(if (mirrored) Point(-vector.x, vector.y) else vector)
         if (boundaries.any { angularDistance(angle, it) < deadZoneDegrees }) return null
         if (angle > LEFT_START && angle < LEFT_END) return Sector.Left
         val slot = Slot.entries.first { angularDistance(angle, it.centerDegrees) <= SLOT_HALF_WIDTH }
         return Sector.Destination(slot)
     }
+
+    /** Screen angle (math convention) where a layout angle is drawn, taking mirroring into account. */
+    fun displayAngle(layoutDegrees: Float, mirrored: Boolean): Float =
+        if (mirrored) ((180f - layoutDegrees) % 360f + 360f) % 360f else layoutDegrees
 
     private fun angularDistance(a: Float, b: Float): Float {
         val diff = ((a - b) % 360f + 360f) % 360f

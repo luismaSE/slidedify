@@ -5,7 +5,6 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import com.slidedify.core.designsystem.SlidedifyTheme
-import com.slidedify.feature.swipe.SwipeRoute
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
@@ -15,7 +14,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             SlidedifyTheme {
-                SwipeRoute()
+                SlidedifyNavHost()
             }
         }
     }
