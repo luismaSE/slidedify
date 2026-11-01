@@ -81,9 +81,10 @@ class SpotifySignIn(private val components: dagger.Lazy<SpotifyComponents>) : Pr
 }
 
 /**
- * Transparent activity that runs the Spotify login (Authorization Code + PKCE) through the
- * official auth library: it uses the installed Spotify app when available (no browser involved)
- * and falls back to a Custom Tab otherwise. The code is then exchanged for tokens by us.
+ * Transparent activity that runs the Spotify login (Authorization Code + PKCE):
+ * 1. with the installed Spotify app through the official auth library (native, no browser);
+ * 2. if that fails or Spotify isn't installed, in an in-app WebView ([SpotifyWebLoginActivity]).
+ * The resulting code is exchanged for tokens by [com.slidedify.provider.spotify.api.TokenProvider].
  */
 class SpotifyLoginActivity : Activity() {
 
@@ -93,28 +94,18 @@ class SpotifyLoginActivity : Activity() {
         fun spotifyComponents(): SpotifyComponents
     }
 
-    private lateinit var state: String
-    private lateinit var verifier: String
+    private var state: String = ""
+    private var verifier: String = ""
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         if (savedInstanceState != null) {
-            // Recreated while the login was open: keep waiting for its result.
+            // Recreated while a login screen was open: keep waiting for its result.
             state = savedInstanceState.getString(KEY_STATE).orEmpty()
             verifier = savedInstanceState.getString(KEY_VERIFIER).orEmpty()
             return
         }
-        val config = components().config
-        val pkce = Pkce.generate()
-        state = Pkce.randomUrlSafe(16)
-        verifier = pkce.verifier
-        val request = AuthorizationRequest.Builder(config.clientId, AuthorizationResponse.Type.CODE, config.redirectUri)
-            .setScopes(config.scopes.toTypedArray())
-            .setState(state)
-            .setPkceInformation(PKCEInformation.sha256(pkce.verifier, pkce.challenge))
-            .build()
-        @Suppress("DEPRECATION") // Plain Activity: no Activity Result API here.
-        startActivityForResult(AuthorizationClient.createLoginActivityIntent(this, request), REQUEST_CODE)
+        if (isSpotifyInstalled()) startNativeLogin() else startWebLogin()
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -123,23 +114,71 @@ class SpotifyLoginActivity : Activity() {
         outState.putString(KEY_VERIFIER, verifier)
     }
 
+    private fun isSpotifyInstalled(): Boolean = packageManager.getLaunchIntentForPackage(SPOTIFY_PACKAGE) != null
+
+    private fun newPkce(): Pkce = Pkce.generate().also {
+        verifier = it.verifier
+        state = Pkce.randomUrlSafe(16)
+    }
+
+    private fun startNativeLogin() {
+        val config = components().config
+        val pkce = newPkce()
+        val request = AuthorizationRequest.Builder(config.clientId, AuthorizationResponse.Type.CODE, config.redirectUri)
+            .setScopes(config.scopes.toTypedArray())
+            .setState(state)
+            .setPkceInformation(PKCEInformation.sha256(pkce.verifier, pkce.challenge))
+            .build()
+        @Suppress("DEPRECATION") // Plain Activity: no Activity Result API here.
+        startActivityForResult(AuthorizationClient.createLoginActivityIntent(this, request), REQUEST_NATIVE)
+    }
+
+    private fun startWebLogin() {
+        val components = components()
+        val pkce = newPkce()
+        val intent = Intent(this, SpotifyWebLoginActivity::class.java)
+            .putExtra(SpotifyWebLoginActivity.EXTRA_AUTHORIZE_URL, components.authClient.authorizeUrl(pkce, state).toString())
+            .putExtra(SpotifyWebLoginActivity.EXTRA_REDIRECT_URI, components.config.redirectUri)
+        @Suppress("DEPRECATION")
+        startActivityForResult(intent, REQUEST_WEB)
+    }
+
     @Deprecated("Deprecated in Java")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode != REQUEST_CODE) return
-        val response = AuthorizationClient.getResponse(resultCode, data)
+        when (requestCode) {
+            REQUEST_NATIVE -> {
+                val response = AuthorizationClient.getResponse(resultCode, data)
+                when (response.type) {
+                    AuthorizationResponse.Type.CODE -> finishWith(response.code, response.state, null)
+                    AuthorizationResponse.Type.ERROR -> {
+                        // e.g. AUTHENTICATION_SERVICE_UNAVAILABLE when the app isn't registered for the SDK yet.
+                        Log.w("Slidedify", "Native Spotify login failed (${response.error}), falling back to WebView")
+                        startWebLogin()
+                    }
+                    else -> finishWith(null, null, "cancelado")
+                }
+            }
+
+            REQUEST_WEB -> finishWith(
+                data?.getStringExtra(SpotifyWebLoginActivity.RESULT_CODE),
+                data?.getStringExtra(SpotifyWebLoginActivity.RESULT_STATE),
+                data?.getStringExtra(SpotifyWebLoginActivity.RESULT_ERROR) ?: if (resultCode != RESULT_OK) "cancelado" else null,
+            )
+        }
+    }
+
+    private fun finishWith(code: String?, returnedState: String?, error: String?) {
         val components = components()
         val appContext = applicationContext
-        val code = response.code
-        val immediateMessage = when {
-            response.type == AuthorizationResponse.Type.ERROR -> "Spotify: ${response.error ?: "error al iniciar sesión"}"
-            response.type != AuthorizationResponse.Type.CODE || code == null -> "Spotify: inicio de sesión cancelado"
-            response.state != state -> "Spotify: respuesta inválida, intentá de nuevo"
+        val problem = when {
+            error != null -> "Spotify: inicio de sesión $error"
+            code == null -> "Spotify: no se recibió el código de acceso"
+            returnedState != state -> "Spotify: respuesta inválida, intentá de nuevo"
             else -> null
         }
-        if (immediateMessage != null) {
-            Log.w("Slidedify", "Spotify login ended: type=${response.type} error=${response.error}")
-            Toast.makeText(appContext, immediateMessage, Toast.LENGTH_LONG).show()
+        if (problem != null) {
+            Toast.makeText(appContext, problem, Toast.LENGTH_LONG).show()
         } else {
             val verifier = verifier
             components.scope.launch {
@@ -160,7 +199,9 @@ class SpotifyLoginActivity : Activity() {
         EntryPointAccessors.fromApplication(applicationContext, Dependencies::class.java).spotifyComponents()
 
     private companion object {
-        const val REQUEST_CODE = 4242
+        const val SPOTIFY_PACKAGE = "com.spotify.music"
+        const val REQUEST_NATIVE = 4242
+        const val REQUEST_WEB = 4243
         const val KEY_STATE = "state"
         const val KEY_VERIFIER = "verifier"
     }
