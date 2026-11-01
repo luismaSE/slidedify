@@ -2,6 +2,8 @@ package com.slidedify.provider.spotify.api
 
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -33,6 +35,7 @@ object SpotifyEndpoints {
     const val TOP_TRACKS = "v1/me/top/tracks"
     fun playlistItems(id: String) = "v1/playlists/$id/items" // verify: was /tracks before 2026
     const val PLAYER = "v1/me/player"
+    const val DEVICES = "v1/me/player/devices"
     const val PLAY = "v1/me/player/play"
     const val PAUSE = "v1/me/player/pause"
 
@@ -113,6 +116,18 @@ data class PlaylistDto(
 )
 
 @Serializable
+data class DeviceDto(
+    val id: String? = null,
+    val name: String = "",
+    val type: String = "",
+    @SerialName("is_active") val isActive: Boolean = false,
+    @SerialName("is_restricted") val isRestricted: Boolean = false,
+)
+
+@Serializable
+data class DevicesDto(val devices: List<DeviceDto> = emptyList())
+
+@Serializable
 data class PlaybackDto(
     @SerialName("is_playing") val isPlaying: Boolean = false,
     @SerialName("progress_ms") val progressMs: Long? = null,
@@ -137,6 +152,14 @@ class SpotifyWebApi(
     suspend fun savedTracks(): List<TrackDto> = pagedEntries(SpotifyEndpoints.SAVED_TRACKS)
 
     suspend fun playlistTracks(playlistId: String): List<TrackDto> = pagedEntries(SpotifyEndpoints.playlistItems(playlistId))
+
+    /** Saved tracks page by page (first page arrives after a single request). */
+    fun savedTrackPages(): Flow<List<TrackDto>> = entryPages(SpotifyEndpoints.SAVED_TRACKS)
+
+    fun playlistTrackPages(playlistId: String): Flow<List<TrackDto>> = entryPages(SpotifyEndpoints.playlistItems(playlistId))
+
+    /** Spotify Connect devices of the user (the phone's Spotify app appears here while it is open). */
+    suspend fun devices(): List<DeviceDto> = get(SpotifyEndpoints.DEVICES, DevicesDto.serializer()).devices
 
     suspend fun topTracks(): List<TrackDto> =
         get("${SpotifyEndpoints.TOP_TRACKS}?limit=${SpotifyEndpoints.PAGE_SIZE}", PageDto.serializer(TrackDto.serializer())).items
@@ -201,13 +224,17 @@ class SpotifyWebApi(
 
     private suspend fun pagedEntries(firstPath: String): List<TrackDto> {
         val result = mutableListOf<TrackDto>()
+        entryPages(firstPath).collect { result += it }
+        return result
+    }
+
+    private fun entryPages(firstPath: String): Flow<List<TrackDto>> = flow {
         var path: String? = if ('?' in firstPath) firstPath else "$firstPath?limit=${SpotifyEndpoints.PAGE_SIZE}"
         while (path != null) {
             val page = get(path, PageDto.serializer(EntryDto.serializer()))
-            result += page.items.mapNotNull { it.content }
+            emit(page.items.mapNotNull { it.content })
             path = page.next
         }
-        return result
     }
 
     private suspend fun <T> get(path: String, serializer: kotlinx.serialization.KSerializer<T>): T =

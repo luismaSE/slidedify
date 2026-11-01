@@ -4,6 +4,7 @@ import com.slidedify.core.domain.repository.TrackSource
 import com.slidedify.core.model.PlaylistId
 import com.slidedify.core.model.TrackId
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
@@ -206,6 +207,46 @@ class SpotifyApiTest {
         signedIn()
         respond(204)
         assertNull(api.playback())
+    }
+
+    @Test
+    fun `pages arrive one by one so the first one can be shown right away`() = runTest {
+        signedIn()
+        respond(body = """{"items":[{"item":${trackJson("1")}}],"next":"${server.url("/v1/playlists/pl/items?offset=50")}"}""")
+        respond(body = """{"items":[{"item":${trackJson("2")}}],"next":null}""")
+
+        val first = SpotifyTrackRepository(api).pages(TrackSource.FromPlaylist(PlaylistId("pl"))).first()
+
+        assertEquals(listOf("1"), first.map { it.id.value })
+        assertEquals(1, server.requestCount) // the second page was not requested yet
+    }
+
+    @Test
+    fun `without an active device playback targets the phone`() = runTest {
+        signedIn()
+        respond(404, """{"error":{"status":404,"message":"Player command failed: No active device found","reason":"NO_ACTIVE_DEVICE"}}""")
+        respond(
+            body = """{"devices":[
+              {"id":"tv","name":"TV","type":"TV","is_active":false},
+              {"id":"phone","name":"Pixel","type":"Smartphone","is_active":false}
+            ]}""",
+        )
+        respond(204)
+        val player = SpotifyWebPlayer(api, kotlinx.coroutines.CoroutineScope(Dispatchers.Unconfined), pollIntervalMs = Long.MAX_VALUE)
+        val track = com.slidedify.core.model.Track(
+            TrackId("abc"), SPOTIFY, "Song", emptyList(), com.slidedify.core.model.Album("", "", null, null), 1000,
+        )
+
+        player.play(track)
+        respond(204)
+        player.pause() // stop the local ticker
+
+        server.takeRequest() // first play (404)
+        assertEquals("/v1/me/player/devices", server.takeRequest().url.encodedPath)
+        val retry = server.takeRequest()
+        assertEquals("phone", retry.url.queryParameter("device_id"))
+        assertTrue(retry.body!!.utf8().contains("spotify:track:abc"))
+        assertNull(player.state.value.error)
     }
 
     class MemoryTokenStore : TokenStore {

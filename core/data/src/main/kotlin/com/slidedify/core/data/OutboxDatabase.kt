@@ -4,9 +4,13 @@ import androidx.room.Dao
 import androidx.room.Database
 import androidx.room.Entity
 import androidx.room.Insert
+import androidx.room.OnConflictStrategy
 import androidx.room.PrimaryKey
 import androidx.room.Query
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
+import com.slidedify.core.domain.repository.SortProgressRepository
 import com.slidedify.core.domain.outbox.OutboxStore
 import com.slidedify.core.domain.outbox.PendingWrite
 import com.slidedify.core.domain.outbox.WriteOp
@@ -49,9 +53,60 @@ interface OutboxDao {
     fun count(): Flow<Int>
 }
 
-@Database(entities = [OutboxEntity::class], version = 1, exportSchema = true)
+/** One row per track already sorted in a source (to resume where the user left off). */
+@Entity(tableName = "sorted_tracks", primaryKeys = ["provider", "source", "trackId"])
+data class SortedTrackEntity(
+    val provider: String,
+    val source: String,
+    val trackId: String,
+)
+
+@Dao
+interface SortedTrackDao {
+    @Query("SELECT trackId FROM sorted_tracks WHERE provider = :provider AND source = :source")
+    suspend fun trackIds(provider: String, source: String): List<String>
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insert(row: SortedTrackEntity)
+
+    @Query("DELETE FROM sorted_tracks WHERE provider = :provider AND source = :source AND trackId = :trackId")
+    suspend fun delete(provider: String, source: String, trackId: String)
+
+    @Query("DELETE FROM sorted_tracks WHERE provider = :provider AND source = :source")
+    suspend fun clear(provider: String, source: String)
+}
+
+@Database(entities = [OutboxEntity::class, SortedTrackEntity::class], version = 2, exportSchema = true)
 abstract class SlidedifyDatabase : RoomDatabase() {
     abstract fun outboxDao(): OutboxDao
+
+    abstract fun sortedTrackDao(): SortedTrackDao
+
+    companion object {
+        /** v2 adds sorting progress; keeps pending writes intact. */
+        val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `sorted_tracks` (`provider` TEXT NOT NULL, `source` TEXT NOT NULL, " +
+                        "`trackId` TEXT NOT NULL, PRIMARY KEY(`provider`, `source`, `trackId`))",
+                )
+            }
+        }
+    }
+}
+
+@Singleton
+class RoomSortProgressRepository @Inject constructor(private val dao: SortedTrackDao) : SortProgressRepository {
+    override suspend fun sortedTracks(provider: ProviderId, sourceKey: String): Set<TrackId> =
+        dao.trackIds(provider.value, sourceKey).mapTo(HashSet(), ::TrackId)
+
+    override suspend fun markSorted(provider: ProviderId, sourceKey: String, track: TrackId) =
+        dao.insert(SortedTrackEntity(provider.value, sourceKey, track.value))
+
+    override suspend fun unmarkSorted(provider: ProviderId, sourceKey: String, track: TrackId) =
+        dao.delete(provider.value, sourceKey, track.value)
+
+    override suspend fun clear(provider: ProviderId, sourceKey: String) = dao.clear(provider.value, sourceKey)
 }
 
 internal fun WriteOp.toEntity(now: Long): OutboxEntity = when (this) {

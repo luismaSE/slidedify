@@ -10,8 +10,11 @@ import com.slidedify.core.domain.player.PlayerState
 import com.slidedify.core.domain.provider.MusicProvider
 import com.slidedify.core.domain.provider.ProviderRegistry
 import com.slidedify.core.domain.repository.LibraryRepository
+import com.slidedify.core.domain.repository.SortProgressRepository
 import com.slidedify.core.domain.repository.TrackSource
+import com.slidedify.core.domain.repository.key
 import com.slidedify.core.domain.session.Decision
+import com.slidedify.core.domain.session.HistoryEntry
 import com.slidedify.core.domain.session.SessionUpdate
 import com.slidedify.core.domain.session.SortSession
 import com.slidedify.core.domain.settings.SettingsRepository
@@ -73,8 +76,13 @@ data class SwipeUiState(
     val settings: SortSettings = SortSettings(),
     val tutorialStep: TutorialStep? = null,
     val loadError: String? = null,
+    /** More pages of the source are still being fetched. */
+    val isLoadingMore: Boolean = false,
+    /** Tracks of this source sorted in previous sessions (already filtered out). */
+    val sortedBefore: Int = 0,
 ) {
-    val isFinished: Boolean get() = !isLoading && current == null && loadError == null
+    val isFinished: Boolean get() = !isLoading && current == null && loadError == null && !isLoadingMore
+    val isWaitingForTracks: Boolean get() = !isLoading && current == null && isLoadingMore
     val canAddDestination: Boolean get() = targets.size < GestureMap.MAX_DESTINATIONS
 
     fun target(slot: Slot): SlotTarget? = targets.getOrNull(slot.index)
@@ -122,6 +130,7 @@ class SwipeViewModel @Inject constructor(
     registry: ProviderRegistry,
     private val libraryRepository: LibraryRepository,
     private val settingsRepository: SettingsRepository,
+    private val progress: SortProgressRepository,
     private val lyricsRepository: LyricsRepository,
     syncStatus: SyncStatus,
     savedStateHandle: SavedStateHandle,
@@ -136,7 +145,11 @@ class SwipeViewModel @Inject constructor(
     private val playlists = MutableStateFlow<List<Playlist>>(emptyList())
     private val lyrics = MutableStateFlow<LyricsState>(LyricsState.Loading)
     private val tutorialStep = MutableStateFlow<TutorialStep?>(null)
-    private val loadError = MutableStateFlow<String?>(null)
+    private data class LoadState(val error: String? = null, val loadingMore: Boolean = false, val sortedBefore: Int = 0)
+
+    private val loadState = MutableStateFlow(LoadState())
+    private var loadJob: Job? = null
+    private var started = false
     private val settings: StateFlow<SortSettings> =
         settingsRepository.settings.stateIn(viewModelScope, SharingStarted.Eagerly, SortSettings())
     private var lyricsJob: Job? = null
@@ -144,13 +157,13 @@ class SwipeViewModel @Inject constructor(
     private val _events = Channel<SwipeEvent>(Channel.BUFFERED)
     val events: Flow<SwipeEvent> = _events.receiveAsFlow()
 
-    private data class Extras(val lyrics: LyricsState, val pending: Int, val step: TutorialStep?, val error: String?)
+    private data class Extras(val lyrics: LyricsState, val pending: Int, val step: TutorialStep?, val load: LoadState)
 
-    private val extras = combine(lyrics, syncStatus.pendingCount, tutorialStep, loadError, ::Extras)
+    private val extras = combine(lyrics, syncStatus.pendingCount, tutorialStep, loadState, ::Extras)
 
     val uiState: StateFlow<SwipeUiState> =
         combine(session, playlists, settings, player.state, extras) { session, playlists, settings, playerState, extras ->
-            val (lyricsState, pending, step, error) = extras
+            val (lyricsState, pending, step, load) = extras
             val base = SwipeUiState(
                 providerName = provider.displayName,
                 sourceName = sourceName,
@@ -158,8 +171,10 @@ class SwipeViewModel @Inject constructor(
                 player = playerState,
                 pendingSync = pending,
                 settings = settings,
+                isLoadingMore = load.loadingMore,
+                sortedBefore = load.sortedBefore,
             )
-            if (session == null) return@combine base.copy(isLoading = error == null, loadError = error)
+            if (session == null) return@combine base.copy(isLoading = load.error == null, loadError = load.error)
             val current = session.current
             val byId = playlists.associateBy { it.id }
             val map = settings.gestureMapFor(provider.id, playlists)
@@ -182,26 +197,63 @@ class SwipeViewModel @Inject constructor(
         load()
     }
 
-    /** Also used by the "Reintentar" button. */
+    /**
+     * Loads the source page by page: the first page is shown as soon as it arrives and the rest
+     * is appended in the background. Tracks sorted in previous sessions are skipped, so the user
+     * continues where they left off. Also used by the "Reintentar" button.
+     */
     fun load() {
-        loadError.value = null
-        viewModelScope.launch {
-            val tracks = try {
+        loadJob?.cancel()
+        loadState.value = LoadState(loadingMore = true)
+        session.value = null
+        loadJob = viewModelScope.launch {
+            try {
                 playlists.value = provider.playlists.writablePlaylists()
-                provider.tracks.tracks(source)
+                    // When sorting a playlist, it cannot also be a destination for its own tracks.
+                    .filterNot { source is TrackSource.FromPlaylist && it.id == source.id }
+                val alreadySorted = progress.sortedTracks(provider.id, source.key)
+                loadState.value = LoadState(loadingMore = true, sortedBefore = alreadySorted.size)
+                provider.tracks.pages(source).collect { page -> onPage(page.filterNot { it.id in alreadySorted }) }
+                if (session.value == null) onPage(emptyList())
+                loadState.value = loadState.value.copy(loadingMore = false)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                loadError.value = "No se pudieron cargar las canciones (${e.message})"
-                return@launch
+                if (session.value == null) {
+                    loadState.value = LoadState(error = "No se pudieron cargar las canciones (${e.message})")
+                } else {
+                    // Keep what was loaded; the user can keep sorting.
+                    loadState.value = loadState.value.copy(loadingMore = false)
+                }
             }
-            // When sorting a playlist, it cannot also be a destination for its own tracks.
-            if (source is TrackSource.FromPlaylist) playlists.value = playlists.value.filterNot { it.id == source.id }
+        }
+    }
+
+    /** "Empezar de nuevo": forget the progress of this source and reload it. */
+    fun restart() {
+        viewModelScope.launch {
+            progress.clear(provider.id, source.key)
+            load()
+        }
+    }
+
+    private suspend fun onPage(tracks: List<Track>) {
+        val current = session.value
+        if (current == null) {
             session.value = SortSession(tracks)
-            // Wait for stored settings so autoplay/tutorial use the user's choice, not the defaults.
-            val loaded = settingsRepository.settings.first()
-            if (!loaded.tutorialCompleted) tutorialStep.value = TutorialStep.Swipe
-            onTrackChanged(autoplay = loaded.autoplay)
+            if (!started) {
+                started = true
+                // Wait for stored settings so autoplay/tutorial use the user's choice, not the defaults.
+                val loaded = settingsRepository.settings.first()
+                if (!loaded.tutorialCompleted) tutorialStep.value = TutorialStep.Swipe
+                onTrackChanged(autoplay = loaded.autoplay)
+            } else {
+                onTrackChanged()
+            }
+        } else {
+            val wasWaiting = current.isFinished
+            session.value = current.append(tracks)
+            if (wasWaiting && session.value?.isFinished == false) onTrackChanged()
         }
     }
 
@@ -282,6 +334,9 @@ class SwipeViewModel @Inject constructor(
         val current = session.value ?: return
         if (!current.canUndo) return
         val before = current.current
+        (current.history.lastOrNull() as? HistoryEntry.Decided)?.let { undone ->
+            viewModelScope.launch { progress.unmarkSorted(provider.id, source.key, undone.track.id) }
+        }
         apply(current.undo())
         _events.trySend(SwipeEvent.Undone)
         if (session.value?.current != before) onTrackChanged()
@@ -310,7 +365,9 @@ class SwipeViewModel @Inject constructor(
 
     private fun decide(decision: Decision) {
         val current = session.value ?: return
+        val track = current.current ?: return
         apply(current.decide(decision))
+        viewModelScope.launch { progress.markSorted(provider.id, source.key, track.id) }
         onTrackChanged()
     }
 

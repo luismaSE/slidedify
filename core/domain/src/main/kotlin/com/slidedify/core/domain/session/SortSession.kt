@@ -51,6 +51,13 @@ data class SortSession(
 
     fun isLiked(track: Track): Boolean = track.id in liked
 
+    /** Adds tracks loaded later (next pages), skipping ones already in the queue. */
+    fun append(more: List<Track>): SortSession {
+        val known = tracks.mapTo(HashSet()) { it.id }
+        val fresh = more.filter { known.add(it.id) }
+        return if (fresh.isEmpty()) this else copy(tracks = tracks + fresh)
+    }
+
     fun decide(decision: Decision): SessionUpdate {
         val track = current ?: return SessionUpdate(this, emptyList())
         val effects = when (decision) {

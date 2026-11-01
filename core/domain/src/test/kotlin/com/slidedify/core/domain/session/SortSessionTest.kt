@@ -69,4 +69,20 @@ class SortSessionTest {
         assertNull(done.current)
         assertTrue(done.decide(Decision.Skip).effects.isEmpty())
     }
+
+    @Test
+    fun `appending pages keeps the position and ignores duplicates`() {
+        val advanced = session.decide(Decision.Skip).session
+        val more = advanced.append(listOf(track(3), track(4), track(5)))
+        assertEquals(5, more.tracks.size)
+        assertEquals(track(2), more.current)
+        assertEquals(listOf(track(3), track(4), track(5)), more.upcoming)
+    }
+
+    @Test
+    fun `a finished session continues when a new page arrives`() {
+        val done = (1..3).fold(session) { s, _ -> s.decide(Decision.Skip).session }
+        assertTrue(done.isFinished)
+        assertEquals(track(4), done.append(listOf(track(4))).current)
+    }
 }

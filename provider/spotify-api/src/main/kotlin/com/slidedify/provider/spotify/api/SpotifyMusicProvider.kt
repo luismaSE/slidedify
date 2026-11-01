@@ -24,7 +24,10 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -60,6 +63,12 @@ class SpotifyTrackRepository(private val api: SpotifyWebApi) : TrackRepository {
         // /recommendations is gone for new apps; top tracks are the base (see docs §5.2).
         TrackSource.Recommended -> api.topTracks()
     }.mapNotNull { it.toDomain() }.distinctBy { it.id }
+
+    override fun pages(source: TrackSource): Flow<List<Track>> = when (source) {
+        TrackSource.LikedSongs -> api.savedTrackPages()
+        is TrackSource.FromPlaylist -> api.playlistTrackPages(source.id.value)
+        TrackSource.Recommended -> flow { emit(api.topTracks()) }
+    }.map { page -> page.mapNotNull { it.toDomain() } }
 }
 
 class SpotifyPlaylistRepository(private val api: SpotifyWebApi) : PlaylistRepository {
@@ -99,10 +108,29 @@ class SpotifyWebPlayer(
     override val state: StateFlow<PlayerState> = _state.asStateFlow()
     private var ticker: Job? = null
 
+    /** Device chosen when no Spotify device is active yet (cached until it fails). */
+    private var deviceId: String? = null
+
     override suspend fun play(track: Track) {
         _state.value = PlayerState(track = track, isPlaying = true, positionMs = 0)
-        guarded { api.play(listOf(trackUri(track.id))) }
+        guarded { playOnDevice(listOf(trackUri(track.id))) }
         startTicking()
+    }
+
+    /**
+     * Web API playback needs an *active* device. Opening the Spotify app isn't enough: it only becomes
+     * active after playing something. So on "no active device" (404) we pick the user's device
+     * (preferring this phone) and target it explicitly, which also activates it.
+     */
+    private suspend fun playOnDevice(uris: List<String>) {
+        try {
+            api.play(uris, deviceId)
+        } catch (e: SpotifyApiException) {
+            if (e.code != 404) throw e
+            val device = pickDevice(api.devices()) ?: throw SpotifyApiException(404, "No Spotify device available")
+            deviceId = device.id
+            api.play(uris, device.id)
+        }
     }
 
     override suspend fun pause() {
@@ -112,8 +140,17 @@ class SpotifyWebPlayer(
     }
 
     override suspend fun resume() {
+        val track = _state.value.track ?: return
         _state.update { it.copy(isPlaying = true) }
-        guarded { api.resume() }
+        // If nothing is active anymore, resuming would 404; start the track again on a device.
+        guarded {
+            try {
+                api.resume()
+            } catch (e: SpotifyApiException) {
+                if (e.code != 404) throw e
+                playOnDevice(listOf(trackUri(track.id)))
+            }
+        }
         startTicking()
     }
 
@@ -153,7 +190,7 @@ class SpotifyWebPlayer(
         } catch (e: SpotifyApiException) {
             val error = when (e.code) {
                 403 -> PlayerError.PremiumRequired
-                404 -> PlayerError.Disconnected("Abrí Spotify en este teléfono para reproducir")
+                404 -> PlayerError.Disconnected("No se encontró Spotify: abrí la app de Spotify en este teléfono y tocá ▶")
                 else -> PlayerError.Disconnected(e.message)
             }
             _state.update { it.copy(isPlaying = false, error = error) }
@@ -162,8 +199,16 @@ class SpotifyWebPlayer(
         }
     }
 
-    private companion object {
+    internal companion object {
         const val TICK_MS = 250L
+
+        /** Active device first, then a phone (most likely this one), then anything controllable. */
+        fun pickDevice(devices: List<DeviceDto>): DeviceDto? {
+            val usable = devices.filter { it.id != null && !it.isRestricted }
+            return usable.firstOrNull { it.isActive }
+                ?: usable.firstOrNull { it.type.equals("Smartphone", ignoreCase = true) }
+                ?: usable.firstOrNull()
+        }
     }
 }
 

@@ -73,6 +73,9 @@ class SwipeViewModelTest {
     private val player = RecordingPlayer()
     private val settings = MemorySettings(SortSettings(tutorialCompleted = true))
     private val requestedSources = mutableListOf<TrackSource>()
+    private val progress = MemoryProgress()
+    /** When set, the provider returns tracks in these pages instead of a single list. */
+    private var pagedTracks: kotlinx.coroutines.flow.Flow<List<Track>>? = null
 
     @Before
     fun setUp() = Dispatchers.setMain(dispatcher)
@@ -99,6 +102,8 @@ class SwipeViewModelTest {
                     requestedSources += source
                     return this@SwipeViewModelTest.tracks
                 }
+
+                override fun pages(source: TrackSource) = pagedTracks ?: kotlinx.coroutines.flow.flow { emit(tracks(source)) }
             }
             override val playlists = object : PlaylistRepository {
                 override suspend fun writablePlaylists() = this@SwipeViewModelTest.playlists
@@ -112,6 +117,7 @@ class SwipeViewModelTest {
             registry = ProviderRegistry(setOf(provider)),
             libraryRepository = library,
             settingsRepository = settings,
+            progress = progress,
             lyricsRepository = object : LyricsRepository {
                 override suspend fun lyricsFor(track: Track) = lyrics
             },
@@ -293,6 +299,74 @@ class SwipeViewModelTest {
         vm.onDoubleTap()
         assertNull(vm.uiState.value.tutorialStep)
         assertTrue(settings.state.value.tutorialCompleted)
+    }
+
+    @Test
+    fun `first page shows right away and later pages are appended`() = runTest(dispatcher) {
+        val pages = kotlinx.coroutines.channels.Channel<List<Track>>(kotlinx.coroutines.channels.Channel.UNLIMITED)
+        pagedTracks = kotlinx.coroutines.flow.flow { for (page in pages) emit(page) }
+        val vm = viewModel()
+        collect(vm)
+
+        pages.send(listOf(tracks[0]))
+        assertEquals(tracks[0], vm.uiState.value.current)
+        assertTrue(vm.uiState.value.isLoadingMore)
+
+        vm.onSkip()
+        assertTrue(vm.uiState.value.isWaitingForTracks) // finished the loaded part, more coming
+
+        pages.send(listOf(tracks[1], tracks[2]))
+        assertEquals(tracks[1], vm.uiState.value.current)
+        assertEquals(tracks[1], player.state.value.track)
+
+        pages.close()
+        assertFalse(vm.uiState.value.isLoadingMore)
+    }
+
+    @Test
+    fun `reopening a source continues after the tracks already sorted`() = runTest(dispatcher) {
+        progress.sorted += "liked" to tracks[0].id
+        val vm = viewModel()
+        collect(vm)
+
+        assertEquals(tracks[1], vm.uiState.value.current)
+        assertEquals(1, vm.uiState.value.sortedBefore)
+
+        vm.onSkip()
+        assertTrue(("liked" to tracks[1].id) in progress.sorted)
+        vm.onUndo()
+        assertFalse(("liked" to tracks[1].id) in progress.sorted)
+    }
+
+    @Test
+    fun `restart forgets the progress of the source`() = runTest(dispatcher) {
+        progress.sorted += "liked" to tracks[0].id
+        val vm = viewModel()
+        collect(vm)
+
+        vm.restart()
+
+        assertEquals(tracks[0], vm.uiState.value.current)
+        assertEquals(0, vm.uiState.value.sortedBefore)
+    }
+
+    private class MemoryProgress : com.slidedify.core.domain.repository.SortProgressRepository {
+        val sorted = mutableSetOf<Pair<String, TrackId>>()
+
+        override suspend fun sortedTracks(provider: ProviderId, sourceKey: String) =
+            sorted.filter { it.first == sourceKey }.mapTo(HashSet()) { it.second }
+
+        override suspend fun markSorted(provider: ProviderId, sourceKey: String, track: TrackId) {
+            sorted += sourceKey to track
+        }
+
+        override suspend fun unmarkSorted(provider: ProviderId, sourceKey: String, track: TrackId) {
+            sorted -= sourceKey to track
+        }
+
+        override suspend fun clear(provider: ProviderId, sourceKey: String) {
+            sorted.removeAll { it.first == sourceKey }
+        }
     }
 
     private class MemorySettings(initial: SortSettings) : SettingsRepository {

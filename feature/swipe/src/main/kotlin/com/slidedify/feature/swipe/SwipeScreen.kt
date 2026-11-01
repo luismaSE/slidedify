@@ -100,6 +100,7 @@ data class SwipeActions(
     val onBack: () -> Unit = {},
     val onOpenSettings: () -> Unit = {},
     val onRetry: () -> Unit = {},
+    val onRestart: () -> Unit = {},
 )
 
 @Composable
@@ -141,6 +142,7 @@ fun SwipeRoute(onBack: () -> Unit, onOpenSettings: () -> Unit, viewModel: SwipeV
             onBack = onBack,
             onOpenSettings = onOpenSettings,
             onRetry = viewModel::load,
+            onRestart = viewModel::restart,
         ),
     )
 }
@@ -168,8 +170,9 @@ fun SwipeScreen(state: SwipeUiState, actions: SwipeActions, notice: String? = nu
             }
             when {
                 state.loadError != null -> LoadError(state.loadError, actions, Modifier.fillMaxSize())
-                state.isLoading -> Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() }
-                state.isFinished -> FinishedMessage(actions.onBack, Modifier.fillMaxSize())
+                state.isLoading || state.isWaitingForTracks ->
+                    Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() }
+                state.isFinished -> FinishedMessage(actions, Modifier.fillMaxSize())
                 else -> {
                     val track = state.current ?: return@Column
                     if (buttonMode) {
@@ -234,9 +237,12 @@ private fun TopBar(state: SwipeUiState, actions: SwipeActions) {
                     .semantics { contentDescription = "${state.pendingSync} cambios pendientes de sincronizar" },
             )
         }
-        if (state.total > 0) {
+        if (state.total > 0 || state.sortedBefore > 0) {
+            // Includes tracks sorted in earlier sessions; "+" while more pages are loading.
+            val done = state.sortedBefore + state.position
+            val total = state.sortedBefore + state.total
             Text(
-                "${(state.position + 1).coerceAtMost(state.total)}/${state.total}",
+                "${(done + 1).coerceAtMost(total)}/$total${if (state.isLoadingMore) "+" else ""}",
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -579,13 +585,14 @@ private fun LoadError(message: String, actions: SwipeActions, modifier: Modifier
 }
 
 @Composable
-private fun FinishedMessage(onBack: () -> Unit, modifier: Modifier = Modifier) {
+private fun FinishedMessage(actions: SwipeActions, modifier: Modifier = Modifier) {
     Column(modifier, verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
         Text("¡Listo!", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(8.dp))
         Text("Ordenaste todas las canciones.", color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(16.dp))
-        Button(onClick = onBack) { Text("Elegir otra fuente") }
+        Button(onClick = actions.onBack) { Text("Elegir otra fuente") }
+        TextButton(onClick = actions.onRestart) { Text("Empezar de nuevo esta lista") }
     }
 }
 
