@@ -14,4 +14,7 @@ android {
 
 dependencies {
     api(project(":core:domain"))
+    api(project(":core:oauth"))
+    implementation(libs.androidx.datastore.preferences)
+    implementation(libs.kotlinx.serialization.json)
 }

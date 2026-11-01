@@ -153,7 +153,6 @@ fun SwipeRoute(onBack: () -> Unit, onOpenSettings: () -> Unit, viewModel: SwipeV
 @Composable
 fun SwipeScreen(state: SwipeUiState, actions: SwipeActions, notice: String? = null) {
     val buttonMode = rememberButtonModeActive(state.settings.buttonMode)
-    var showLyrics by remember { mutableStateOf(false) }
     var showList by remember { mutableStateOf(false) }
     val screenActions = actions.copy(onOpenList = { showList = true })
     var showAddDestination by remember { mutableStateOf(false) }
@@ -188,17 +187,12 @@ fun SwipeScreen(state: SwipeUiState, actions: SwipeActions, notice: String? = nu
                     } else {
                         GestureArea(state, track, actions, Modifier.weight(1f).fillMaxWidth())
                     }
-                    LyricsPanel(state.lyrics, state.player.positionMs, onOpen = { showLyrics = true })
                     BottomBar(state, actions, onAddDestination = { showAddDestination = true })
                 }
             }
         }
     }
 
-    val lyrics = state.lyrics
-    if (showLyrics && lyrics is LyricsState.Available) {
-        LyricsSheet(lyrics.lyrics, state.player.positionMs, onDismiss = { showLyrics = false })
-    }
     if (showList) {
         TrackListSheet(
             state = state,

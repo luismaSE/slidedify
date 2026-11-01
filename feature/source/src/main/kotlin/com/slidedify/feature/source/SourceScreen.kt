@@ -135,6 +135,7 @@ class SourceViewModel @Inject constructor(
 fun SourceRoute(
     onSourceSelected: (SourceOption) -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenTransfer: () -> Unit,
     viewModel: SourceViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -143,6 +144,7 @@ fun SourceRoute(
         state = state,
         onSourceSelected = onSourceSelected,
         onOpenSettings = onOpenSettings,
+        onOpenTransfer = onOpenTransfer,
         onSelectProvider = viewModel::selectProvider,
         onSignIn = { viewModel.signIn(context) },
         onSignOut = viewModel::signOut,
@@ -155,6 +157,7 @@ fun SourceScreen(
     state: SourceUiState,
     onSourceSelected: (SourceOption) -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenTransfer: () -> Unit,
     onSelectProvider: (ProviderId) -> Unit,
     onSignIn: () -> Unit,
     onSignOut: () -> Unit,
@@ -163,7 +166,10 @@ fun SourceScreen(
         topBar = {
             TopAppBar(
                 title = { Text("¿Qué querés ordenar?") },
-                actions = { TextButton(onClick = onOpenSettings) { Text("⚙ Ajustes") } },
+                actions = {
+                    TextButton(onClick = onOpenTransfer) { Text("⇄ Transferir") }
+                    TextButton(onClick = onOpenSettings) { Text("⚙") }
+                },
             )
         },
     ) { padding ->

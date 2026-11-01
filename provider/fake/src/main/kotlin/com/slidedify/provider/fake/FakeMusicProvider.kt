@@ -9,6 +9,7 @@ import com.slidedify.core.domain.provider.MusicProvider
 import com.slidedify.core.domain.provider.ProviderAuth
 import com.slidedify.core.domain.provider.ProviderCapabilities
 import com.slidedify.core.domain.repository.PlaylistRepository
+import com.slidedify.core.domain.repository.TrackQuery
 import com.slidedify.core.domain.repository.TrackRepository
 import com.slidedify.core.domain.repository.TrackSource
 import com.slidedify.core.model.Album
@@ -45,7 +46,7 @@ class FakeMusicProvider @Inject constructor(
 ) : MusicProvider {
     override val id = ID
     override val displayName = "Demo"
-    override val capabilities = ProviderCapabilities()
+    override val capabilities = ProviderCapabilities(canSearch = true)
     override val auth: ProviderAuth = object : ProviderAuth {
         override val state: StateFlow<AuthState> = MutableStateFlow(AuthState.SignedIn("demo"))
 
@@ -67,7 +68,7 @@ internal object FakeCatalog {
         Playlist(PlaylistId("running"), FakeMusicProvider.ID, "Running"),
     )
 
-    // A few real songs so LRCLIB can show lyrics in the demo; the rest are invented.
+    // A few real songs so the demo can play real previews; the rest are invented.
     private val rows = listOf(
         Triple("Bohemian Rhapsody", "Queen", "A Night at the Opera" to 1975),
         Triple("Take On Me", "a-ha", "Hunting High and Low" to 1985),
@@ -103,6 +104,9 @@ internal object FakeCatalog {
 
 @Singleton
 class FakeTrackRepository @Inject constructor() : TrackRepository {
+    override suspend fun search(query: TrackQuery): List<Track> =
+        FakeCatalog.tracks.filter { it.title.contains(query.title, ignoreCase = true) || query.title.contains(it.title, ignoreCase = true) }
+
     override suspend fun tracks(source: TrackSource): List<Track> = when (source) {
         TrackSource.LikedSongs, TrackSource.Recommended -> FakeCatalog.tracks
         // Each demo playlist gets a stable subset of the catalog.

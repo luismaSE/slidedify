@@ -8,6 +8,7 @@ import com.slidedify.core.domain.repository.TrackSource
 import com.slidedify.feature.settings.GestureSettingsRoute
 import com.slidedify.feature.source.SourceRoute
 import com.slidedify.feature.swipe.SwipeRoute
+import com.slidedify.feature.transfer.TransferRoute
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -20,6 +21,9 @@ data class SwipeDestination(val kind: String, val playlistId: String? = null, va
 @Serializable
 object SettingsDestination
 
+@Serializable
+object TransferDestination
+
 @Composable
 fun SlidedifyNavHost() {
     val navController = rememberNavController()
@@ -31,7 +35,11 @@ fun SlidedifyNavHost() {
                     navController.navigate(SwipeDestination(option.source.kind.name, playlistId, option.title))
                 },
                 onOpenSettings = { navController.navigate(SettingsDestination) },
+                onOpenTransfer = { navController.navigate(TransferDestination) },
             )
+        }
+        composable<TransferDestination> {
+            TransferRoute(onBack = { navController.popBackStack() })
         }
         composable<SwipeDestination> {
             SwipeRoute(

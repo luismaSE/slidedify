@@ -33,6 +33,8 @@ data class Track(
     val durationMs: Long,
     /** Link to open the track in the provider's own app or website (required by most providers' terms). */
     val externalUrl: String? = null,
+    /** International Standard Recording Code: identifies the same recording across services, when known. */
+    val isrc: String? = null,
 ) {
     val artistNames: String get() = artists.joinToString(", ") { it.name }
 }

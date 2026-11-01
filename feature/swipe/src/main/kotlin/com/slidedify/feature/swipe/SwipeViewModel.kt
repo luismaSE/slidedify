@@ -3,8 +3,6 @@ package com.slidedify.feature.swipe
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.slidedify.core.domain.lyrics.Lyrics
-import com.slidedify.core.domain.lyrics.LyricsRepository
 import com.slidedify.core.domain.outbox.SyncStatus
 import com.slidedify.core.domain.player.PlayerState
 import com.slidedify.core.domain.provider.MusicProvider
@@ -45,14 +43,6 @@ data class SlotTarget(val slot: Slot, val playlists: List<Playlist>) {
     val label: String get() = playlists.joinToString(" + ") { it.name }
 }
 
-sealed interface LyricsState {
-    data object Loading : LyricsState
-
-    data class Available(val lyrics: Lyrics) : LyricsState
-
-    data object Unavailable : LyricsState
-}
-
 /** Steps of the first-run tutorial; each one completes when the user performs the gesture. */
 enum class TutorialStep { Swipe, Wheel, DoubleTap }
 
@@ -72,7 +62,6 @@ data class SwipeUiState(
     val addablePlaylists: List<Playlist> = emptyList(),
     val canCreatePlaylists: Boolean = false,
     val player: PlayerState = PlayerState(),
-    val lyrics: LyricsState = LyricsState.Loading,
     val pendingSync: Int = 0,
     val settings: SortSettings = SortSettings(),
     val tutorialStep: TutorialStep? = null,
@@ -134,7 +123,6 @@ class SwipeViewModel @Inject constructor(
     private val libraryRepository: LibraryRepository,
     private val settingsRepository: SettingsRepository,
     private val progress: SortProgressRepository,
-    private val lyricsRepository: LyricsRepository,
     syncStatus: SyncStatus,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
@@ -146,7 +134,6 @@ class SwipeViewModel @Inject constructor(
 
     private val session = MutableStateFlow<SortSession?>(null)
     private val playlists = MutableStateFlow<List<Playlist>>(emptyList())
-    private val lyrics = MutableStateFlow<LyricsState>(LyricsState.Loading)
     private val tutorialStep = MutableStateFlow<TutorialStep?>(null)
     private data class LoadState(val error: String? = null, val loadingMore: Boolean = false)
 
@@ -159,18 +146,17 @@ class SwipeViewModel @Inject constructor(
     private var alreadySorted: Set<TrackId> = emptySet()
     private val settings: StateFlow<SortSettings> =
         settingsRepository.settings.stateIn(viewModelScope, SharingStarted.Eagerly, SortSettings())
-    private var lyricsJob: Job? = null
 
     private val _events = Channel<SwipeEvent>(Channel.BUFFERED)
     val events: Flow<SwipeEvent> = _events.receiveAsFlow()
 
-    private data class Extras(val lyrics: LyricsState, val pending: Int, val step: TutorialStep?, val load: LoadState)
+    private data class Extras(val pending: Int, val step: TutorialStep?, val load: LoadState)
 
-    private val extras = combine(lyrics, syncStatus.pendingCount, tutorialStep, loadState, ::Extras)
+    private val extras = combine(syncStatus.pendingCount, tutorialStep, loadState, ::Extras)
 
     val uiState: StateFlow<SwipeUiState> =
         combine(session, playlists, settings, player.state, extras) { session, playlists, settings, playerState, extras ->
-            val (lyricsState, pending, step, load) = extras
+            val (pending, step, load) = extras
             val base = SwipeUiState(
                 providerName = provider.displayName,
                 sourceName = sourceName,
@@ -196,7 +182,6 @@ class SwipeViewModel @Inject constructor(
                 targets = map.slots.map { slot -> SlotTarget(slot, map.playlistsAt(slot).mapNotNull(byId::get)) },
                 addablePlaylists = playlists.filterNot { map.contains(it.id) },
                 canCreatePlaylists = provider.capabilities.canCreatePlaylists,
-                lyrics = lyricsState,
                 tutorialStep = step,
             )
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), SwipeUiState())
@@ -395,7 +380,6 @@ class SwipeViewModel @Inject constructor(
         viewModelScope.launch { update.effects.forEach { libraryRepository.apply(it) } }
     }
 
-    /** Autoplay (if enabled) and lyrics for whatever track is on screen. */
     /**
      * The app starts paused. After that, the next track follows the last choice: it starts
      * automatically if the previous one was playing, and stays paused if it was paused.
@@ -408,19 +392,6 @@ class SwipeViewModel @Inject constructor(
                 keepPlaying && player.state.value.track?.id != track.id -> player.play(track)
                 !keepPlaying && player.state.value.isPlaying -> player.pause()
             }
-        }
-        lyricsJob?.cancel()
-        lyrics.value = LyricsState.Loading
-        if (track == null) return
-        lyricsJob = viewModelScope.launch {
-            val found = try {
-                lyricsRepository.lyricsFor(track)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                null // Lyrics are optional; never break the sorting flow.
-            }
-            lyrics.value = found?.let(LyricsState::Available) ?: LyricsState.Unavailable
         }
     }
 

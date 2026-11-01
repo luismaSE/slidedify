@@ -36,8 +36,19 @@ val TrackSource.key: String
         is TrackSource.FromPlaylist -> "playlist:${id.value}"
     }
 
+/** What to look for when finding a track in another service. */
+data class TrackQuery(
+    val title: String,
+    val artist: String,
+    val durationMs: Long = 0,
+    val isrc: String? = null,
+)
+
 interface TrackRepository {
     suspend fun tracks(source: TrackSource): List<Track>
+
+    /** Catalog search, used to match tracks across services. Only called when `capabilities.canSearch`. */
+    suspend fun search(query: TrackQuery): List<Track> = emptyList()
 
     /**
      * Tracks in pages, so big sources (thousands of songs) show the first page right away while

@@ -15,6 +15,8 @@ import kotlinx.coroutines.flow.StateFlow
 data class ProviderCapabilities(
     /** Has a "liked songs" collection that can be written (double tap). */
     val canLike: Boolean = true,
+    /** Can search its catalog (needed to receive tracks from another service). */
+    val canSearch: Boolean = false,
     /** Can create new playlists from the app. */
     val canCreatePlaylists: Boolean = true,
     /** Can play whole tracks on demand (some services only allow previews or need a paid plan). */

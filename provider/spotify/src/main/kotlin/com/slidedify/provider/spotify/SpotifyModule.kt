@@ -10,6 +10,7 @@ import com.slidedify.core.domain.player.PreviewSource
 import com.slidedify.core.domain.provider.MusicProvider
 import com.slidedify.core.media.PreviewPlayer
 import com.slidedify.core.model.ProviderId
+import com.slidedify.core.platform.OAuthWebLoginActivity
 import com.slidedify.core.platform.ProviderSignIn
 import com.spotify.sdk.android.auth.AuthorizationClient
 import com.spotify.sdk.android.auth.AuthorizationRequest
@@ -102,7 +103,7 @@ class SpotifySignIn(private val components: dagger.Lazy<SpotifyComponents>) : Pr
 /**
  * Transparent activity that runs the Spotify login (Authorization Code + PKCE):
  * 1. with the installed Spotify app through the official auth library (native, no browser);
- * 2. if that fails or Spotify isn't installed, in an in-app WebView ([SpotifyWebLoginActivity]).
+ * 2. if that fails or Spotify isn't installed, in an in-app WebView ([OAuthWebLoginActivity]).
  * The resulting code is exchanged for tokens by [com.slidedify.provider.spotify.api.TokenProvider].
  */
 class SpotifyLoginActivity : Activity() {
@@ -155,9 +156,9 @@ class SpotifyLoginActivity : Activity() {
     private fun startWebLogin() {
         val components = components()
         val pkce = newPkce()
-        val intent = Intent(this, SpotifyWebLoginActivity::class.java)
-            .putExtra(SpotifyWebLoginActivity.EXTRA_AUTHORIZE_URL, components.authClient.authorizeUrl(pkce, state).toString())
-            .putExtra(SpotifyWebLoginActivity.EXTRA_REDIRECT_URI, components.config.redirectUri)
+        val intent = Intent(this, OAuthWebLoginActivity::class.java)
+            .putExtra(OAuthWebLoginActivity.EXTRA_AUTHORIZE_URL, components.authClient.authorizeUrl(pkce, state).toString())
+            .putExtra(OAuthWebLoginActivity.EXTRA_REDIRECT_URI, components.config.redirectUri)
         @Suppress("DEPRECATION")
         startActivityForResult(intent, REQUEST_WEB)
     }
@@ -180,9 +181,9 @@ class SpotifyLoginActivity : Activity() {
             }
 
             REQUEST_WEB -> finishWith(
-                data?.getStringExtra(SpotifyWebLoginActivity.RESULT_CODE),
-                data?.getStringExtra(SpotifyWebLoginActivity.RESULT_STATE),
-                data?.getStringExtra(SpotifyWebLoginActivity.RESULT_ERROR) ?: if (resultCode != RESULT_OK) "cancelado" else null,
+                data?.getStringExtra(OAuthWebLoginActivity.RESULT_CODE),
+                data?.getStringExtra(OAuthWebLoginActivity.RESULT_STATE),
+                data?.getStringExtra(OAuthWebLoginActivity.RESULT_ERROR) ?: if (resultCode != RESULT_OK) "cancelado" else null,
             )
         }
     }

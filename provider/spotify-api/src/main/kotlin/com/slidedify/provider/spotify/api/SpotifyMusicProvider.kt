@@ -9,6 +9,7 @@ import com.slidedify.core.domain.provider.MusicProvider
 import com.slidedify.core.domain.provider.ProviderAuth
 import com.slidedify.core.domain.provider.ProviderCapabilities
 import com.slidedify.core.domain.repository.PlaylistRepository
+import com.slidedify.core.domain.repository.TrackQuery
 import com.slidedify.core.domain.repository.TrackRepository
 import com.slidedify.core.domain.repository.TrackSource
 import com.slidedify.core.model.Album
@@ -53,6 +54,7 @@ internal fun TrackDto.toDomain(): Track? {
         ),
         durationMs = durationMs,
         externalUrl = externalUrls["spotify"],
+        isrc = externalIds["isrc"],
     )
 }
 
@@ -63,6 +65,17 @@ class SpotifyTrackRepository(private val api: SpotifyWebApi) : TrackRepository {
         // /recommendations is gone for new apps; top tracks are the base (see docs §5.2).
         TrackSource.Recommended -> api.topTracks()
     }.mapNotNull { it.toDomain() }.distinctBy { it.id }
+
+    /** ISRC first (exact), then title + artist. */
+    override suspend fun search(query: TrackQuery): List<Track> {
+        query.isrc?.let { isrc ->
+            val exact = api.searchTracks("isrc:$isrc").mapNotNull { it.toDomain() }
+            if (exact.isNotEmpty()) return exact
+        }
+        val text = "track:\"${query.title}\" artist:\"${query.artist}\""
+        return api.searchTracks(text).mapNotNull { it.toDomain() }
+            .ifEmpty { api.searchTracks("${query.artist} ${query.title}").mapNotNull { it.toDomain() } }
+    }
 
     override fun pages(source: TrackSource): Flow<List<Track>> = when (source) {
         TrackSource.LikedSongs -> api.savedTrackPages()
@@ -256,6 +269,7 @@ class SpotifyMusicProvider(
     override val capabilities = ProviderCapabilities(
         canLike = true,
         canCreatePlaylists = true,
+        canSearch = true,
         canPlayFullTracks = true, // Premium; free accounts get PlayerError.PremiumRequired
         sources = setOf(TrackSource.Kind.LikedSongs, TrackSource.Kind.Playlist, TrackSource.Kind.Recommended),
         maxTracksPerWrite = SpotifyEndpoints.MAX_LIBRARY_WRITE,

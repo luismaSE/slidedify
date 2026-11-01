@@ -1,9 +1,6 @@
 package com.slidedify.feature.swipe
 
 import androidx.lifecycle.SavedStateHandle
-import com.slidedify.core.domain.lyrics.LyricLine
-import com.slidedify.core.domain.lyrics.Lyrics
-import com.slidedify.core.domain.lyrics.LyricsRepository
 import com.slidedify.core.domain.outbox.LibraryWriter
 import com.slidedify.core.domain.outbox.SyncStatus
 import com.slidedify.core.domain.player.Player
@@ -86,7 +83,6 @@ class SwipeViewModelTest {
     private fun viewModel(
         caps: ProviderCapabilities = ProviderCapabilities(),
         args: Map<String, Any?> = emptyMap(),
-        lyrics: Lyrics? = null,
     ): SwipeViewModel {
         val provider = object : MusicProvider {
             override val id = providerId
@@ -118,9 +114,6 @@ class SwipeViewModelTest {
             libraryRepository = library,
             settingsRepository = settings,
             progress = progress,
-            lyricsRepository = object : LyricsRepository {
-                override suspend fun lyricsFor(track: Track) = lyrics
-            },
             syncStatus = object : SyncStatus {
                 override val pendingCount = MutableStateFlow(0)
             },
@@ -281,14 +274,6 @@ class SwipeViewModelTest {
         assertEquals("gym", vm.uiState.value.sourceName)
         assertTrue(vm.uiState.value.targets.none { target -> target.playlists.any { it.id == PlaylistId("gym") } })
         assertTrue(vm.uiState.value.addablePlaylists.none { it.id == PlaylistId("gym") })
-    }
-
-    @Test
-    fun `lyrics are loaded for the current track`() = runTest(dispatcher) {
-        val lyrics = Lyrics(listOf(LyricLine(0, "hello")))
-        val vm = viewModel(lyrics = lyrics)
-        collect(vm)
-        assertEquals(LyricsState.Available(lyrics), vm.uiState.value.lyrics)
     }
 
     @Test

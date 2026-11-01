@@ -24,6 +24,7 @@ work = "2.10.2"
 navigation = "2.9.0"
 browser = "1.8.0"
 spotifyAuth = "5.0.0"
+playServicesAuth = "21.2.0"
 
 [libraries]
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
@@ -61,6 +62,7 @@ androidx-room-runtime = { module = "androidx.room:room-runtime", version.ref = "
 androidx-room-ktx = { module = "androidx.room:room-ktx", version.ref = "room" }
 androidx-room-compiler = { module = "androidx.room:room-compiler", version.ref = "room" }
 androidx-work-runtime = { module = "androidx.work:work-runtime-ktx", version.ref = "work" }
+play-services-auth = { module = "com.google.android.gms:play-services-auth", version.ref = "playServicesAuth" }
 spotify-auth = { module = "com.spotify.android:auth", version.ref = "spotifyAuth" }
 androidx-browser = { module = "androidx.browser:browser", version.ref = "browser" }
 androidx-navigation-compose = { module = "androidx.navigation:navigation-compose", version.ref = "navigation" }

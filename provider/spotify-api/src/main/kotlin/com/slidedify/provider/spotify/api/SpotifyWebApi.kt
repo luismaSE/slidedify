@@ -33,6 +33,9 @@ object SpotifyEndpoints {
     const val LIBRARY = "v1/me/library" // verify: request format
     const val MY_PLAYLISTS = "v1/me/playlists" // GET list, POST create (verify for create)
     const val TOP_TRACKS = "v1/me/top/tracks"
+    const val SEARCH = "v1/search"
+    /** Developer reports say search is capped at 10 results since 2026. */
+    const val SEARCH_LIMIT = 10
     fun playlistItems(id: String) = "v1/playlists/$id/items" // verify: was /tracks before 2026
     const val PLAYER = "v1/me/player"
     const val DEVICES = "v1/me/player/devices"
@@ -85,6 +88,7 @@ data class TrackDto(
     @SerialName("duration_ms") val durationMs: Long = 0,
     @SerialName("is_local") val isLocal: Boolean = false,
     @SerialName("external_urls") val externalUrls: Map<String, String> = emptyMap(),
+    @SerialName("external_ids") val externalIds: Map<String, String> = emptyMap(),
 )
 
 /** Saved-tracks and playlist entries. Playlists renamed `track` to `item` in 2026; accept both. */
@@ -102,6 +106,9 @@ data class PageDto<T>(
     val next: String? = null,
     val total: Int? = null,
 )
+
+@Serializable
+data class SearchDto(val tracks: PageDto<TrackDto> = PageDto())
 
 @Serializable
 data class OwnerDto(val id: String)
@@ -160,6 +167,16 @@ class SpotifyWebApi(
 
     /** Spotify Connect devices of the user (the phone's Spotify app appears here while it is open). */
     suspend fun devices(): List<DeviceDto> = get(SpotifyEndpoints.DEVICES, DevicesDto.serializer()).devices
+
+    /** Catalog search; [query] uses Spotify's field filters, e.g. `isrc:XXX` or `track:"x" artist:"y"`. */
+    suspend fun searchTracks(query: String): List<TrackDto> {
+        val url = baseUrl.newBuilder().addPathSegments(SpotifyEndpoints.SEARCH)
+            .addQueryParameter("q", query)
+            .addQueryParameter("type", "track")
+            .addQueryParameter("limit", SpotifyEndpoints.SEARCH_LIMIT.toString())
+            .build()
+        return get(url.toString(), SearchDto.serializer()).tracks.items
+    }
 
     suspend fun topTracks(): List<TrackDto> =
         get("${SpotifyEndpoints.TOP_TRACKS}?limit=${SpotifyEndpoints.PAGE_SIZE}", PageDto.serializer(TrackDto.serializer())).items

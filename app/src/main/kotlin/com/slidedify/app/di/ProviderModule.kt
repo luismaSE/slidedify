@@ -2,6 +2,8 @@ package com.slidedify.app.di
 
 import com.slidedify.core.domain.provider.MusicProvider
 import com.slidedify.core.domain.provider.ProviderRegistry
+import com.slidedify.core.domain.repository.LibraryRepository
+import com.slidedify.core.domain.transfer.PlaylistTransfer
 import com.slidedify.core.platform.ProviderSignIn
 import dagger.Module
 import dagger.Provides
@@ -24,6 +26,12 @@ object ProviderModule {
         ProviderRegistry(providers, preferred = providers.firstOrNull { it.id != DEMO_ID }?.id)
 
     private val DEMO_ID = com.slidedify.core.model.ProviderId("demo")
+
+    /** Cross-service copy/move/sync; writes go through the offline outbox. */
+    @Provides
+    @Singleton
+    fun playlistTransfer(registry: ProviderRegistry, library: LibraryRepository): PlaylistTransfer =
+        PlaylistTransfer(registry, library)
 }
 
 /** Declares the sets so they exist even when no module contributes to them. */
