@@ -88,7 +88,7 @@ class SwipeViewModelTest {
 
         vm.onWheelCommit(setOf(Slot.UP, Slot.RIGHT))
 
-        assertEquals(
+        assertEquals<List<LibraryEffect>>(
             listOf(LibraryEffect.AddToPlaylists(tracks[0], setOf(PlaylistId("gym"), PlaylistId("focus")))),
             library.effects,
         )
@@ -105,7 +105,7 @@ class SwipeViewModelTest {
         vm.onUndo()
 
         assertEquals(tracks[0], vm.uiState.value.current)
-        assertEquals(LibraryEffect.RemoveFromPlaylists(tracks[0], setOf(PlaylistId("running"))), library.effects.last())
+        assertEquals<LibraryEffect>(LibraryEffect.RemoveFromPlaylists(tracks[0], setOf(PlaylistId("running"))), library.effects.last())
     }
 
     @Test
@@ -117,7 +117,7 @@ class SwipeViewModelTest {
 
         assertTrue(vm.uiState.value.isLiked)
         assertEquals(tracks[0], vm.uiState.value.current)
-        assertEquals(LibraryEffect.SetLiked(tracks[0], true), library.effects.single())
+        assertEquals<LibraryEffect>(LibraryEffect.SetLiked(tracks[0], true), library.effects.single())
     }
 
     private class RecordingLibrary : LibraryRepository {
