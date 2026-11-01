@@ -15,6 +15,8 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -28,11 +30,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
+import com.slidedify.core.designsystem.AppIcons
 import com.slidedify.core.domain.provider.AuthState
 import com.slidedify.core.domain.provider.MusicProvider
 import com.slidedify.core.domain.provider.ProviderRegistry
@@ -167,8 +171,8 @@ fun SourceScreen(
             TopAppBar(
                 title = { Text("¿Qué querés ordenar?") },
                 actions = {
-                    TextButton(onClick = onOpenTransfer) { Text("⇄ Transferir") }
-                    TextButton(onClick = onOpenSettings) { Text("⚙") }
+                    IconButton(onClick = onOpenTransfer) { Icon(AppIcons.Swap, contentDescription = "Transferir playlists entre servicios") }
+                    IconButton(onClick = onOpenSettings) { Icon(AppIcons.Tune, contentDescription = "Ajustes") }
                 },
             )
         },
@@ -237,8 +241,20 @@ private fun SourceList(state: SourceUiState, userName: String, onSourceSelected:
         }
         items(state.options, key = { it.source.toString() }) { option ->
             ListItem(
-                headlineContent = { Text(option.title) },
+                leadingContent = {
+                    Icon(
+                        when (option.source) {
+                            TrackSource.LikedSongs -> AppIcons.Heart
+                            TrackSource.Recommended -> AppIcons.Queue
+                            is TrackSource.FromPlaylist -> AppIcons.Library
+                        },
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                },
+                headlineContent = { Text(option.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 supportingContent = { Text(option.subtitle) },
+                trailingContent = { Icon(AppIcons.Chevron, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
                 modifier = Modifier.clickable { onSourceSelected(option) },
             )
             HorizontalDivider()

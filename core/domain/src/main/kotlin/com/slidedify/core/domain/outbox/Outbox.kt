@@ -16,6 +16,12 @@ interface LibraryWriter {
     suspend fun removeFromPlaylist(playlist: PlaylistId, tracks: List<TrackId>)
 
     suspend fun setLiked(tracks: List<TrackId>, liked: Boolean)
+
+    /**
+     * Tracks currently in [playlist], used to avoid adding duplicates (services like Spotify accept
+     * the same track twice). `null` = this service can't tell, so nothing is filtered.
+     */
+    suspend fun playlistTrackIds(playlist: PlaylistId): Set<TrackId>? = null
 }
 
 /** A single pending write against one provider. */

@@ -15,6 +15,8 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -36,6 +38,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
+import com.slidedify.core.designsystem.AppIcons
 import com.slidedify.core.domain.provider.AuthState
 import com.slidedify.core.domain.provider.ProviderRegistry
 import com.slidedify.core.domain.repository.TrackSource
@@ -174,7 +177,7 @@ private fun TransferScreen(state: TransferUiState, vm: TransferViewModel, onBack
         topBar = {
             TopAppBar(
                 title = { Text("Transferir playlists") },
-                navigationIcon = { TextButton(onClick = onBack) { Text("← Volver") } },
+                navigationIcon = { IconButton(onClick = onBack) { Icon(AppIcons.Back, contentDescription = "Volver") } },
             )
         },
     ) { padding ->

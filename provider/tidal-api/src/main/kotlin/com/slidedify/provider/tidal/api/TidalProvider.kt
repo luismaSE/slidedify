@@ -289,6 +289,9 @@ class TidalLibraryWriter(private val api: TidalApi) : LibraryWriter {
         api.removeFromPlaylist(playlist.value, tracks.map { it.value })
 
     override suspend fun setLiked(tracks: List<TrackId>, liked: Boolean) = api.setInCollection(tracks.map { it.value }, liked)
+
+    override suspend fun playlistTrackIds(playlist: PlaylistId): Set<TrackId> =
+        api.allTracks(TidalEndpoints.playlistItems(playlist.value)).mapTo(HashSet()) { it.id }
 }
 
 class TidalAuth(private val tokens: RefreshingTokens, private val api: TidalApi) : ProviderAuth {

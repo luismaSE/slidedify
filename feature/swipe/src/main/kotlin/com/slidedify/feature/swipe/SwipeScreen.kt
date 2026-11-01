@@ -1,5 +1,6 @@
 package com.slidedify.feature.swipe
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.VectorConverter
 import androidx.compose.animation.core.spring
@@ -17,12 +18,17 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
+import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedIconButton
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -52,8 +58,10 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.CustomAccessibilityAction
@@ -65,7 +73,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.palette.graphics.Palette
 import coil3.compose.AsyncImage
+import coil3.request.ImageRequest
+import coil3.request.allowHardware
+import coil3.toBitmap
+import com.slidedify.core.designsystem.AppIcons
 import com.slidedify.core.designsystem.color
 import com.slidedify.core.domain.gesture.DoubleTapDetector
 import com.slidedify.core.domain.gesture.GestureFeedback
@@ -154,10 +167,18 @@ fun SwipeRoute(onBack: () -> Unit, onOpenSettings: () -> Unit, viewModel: SwipeV
 fun SwipeScreen(state: SwipeUiState, actions: SwipeActions, notice: String? = null) {
     val buttonMode = rememberButtonModeActive(state.settings.buttonMode)
     var showList by remember { mutableStateOf(false) }
+    var coverColor by remember { mutableStateOf<Color?>(null) }
+    LaunchedEffect(state.current?.id) { coverColor = null }
+    val baseBackground = MaterialTheme.colorScheme.background
+    val background by animateColorAsState(
+        targetValue = coverColor?.let { lerp(baseBackground, it, 0.16f) } ?: baseBackground,
+        animationSpec = tween(400),
+        label = "cover tint",
+    )
     val screenActions = actions.copy(onOpenList = { showList = true })
     var showAddDestination by remember { mutableStateOf(false) }
 
-    Scaffold(containerColor = MaterialTheme.colorScheme.background) { padding ->
+    Scaffold(containerColor = background) { padding ->
         Column(
             Modifier
                 .fillMaxSize()
@@ -181,11 +202,11 @@ fun SwipeScreen(state: SwipeUiState, actions: SwipeActions, notice: String? = nu
                     val track = state.current ?: return@Column
                     if (buttonMode) {
                         Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                            TrackCard(track, state, actions, Modifier.fillMaxSize().padding(CardInset))
+                            TrackCard(track, state, actions, Modifier.fillMaxSize().padding(CardInset), onCoverColor = { coverColor = it })
                         }
                         ButtonPanel(track, state, actions)
                     } else {
-                        GestureArea(state, track, actions, Modifier.weight(1f).fillMaxWidth())
+                        GestureArea(state, track, actions, Modifier.weight(1f).fillMaxWidth(), onCoverColor = { coverColor = it })
                     }
                     BottomBar(state, actions, onAddDestination = { showAddDestination = true })
                 }
@@ -224,44 +245,51 @@ private fun TopBar(state: SwipeUiState, actions: SwipeActions) {
     Row(
         Modifier
             .fillMaxWidth()
-            .padding(horizontal = 4.dp, vertical = 4.dp),
+            .padding(horizontal = 4.dp, vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        TextButton(onClick = actions.onBack) { Text("←") }
+        IconButton(onClick = actions.onBack) { Icon(AppIcons.Back, contentDescription = "Volver") }
         Column(Modifier.weight(1f)) {
             Text(
-                "Ordenando · ${state.providerName}",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                state.sourceName,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
-            Text(state.sourceName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                val progress = if (state.total > 0) " · ${state.sortedCount} de ${state.total}${if (state.isLoadingMore) "+" else ""}" else ""
+                Text(
+                    state.providerName + progress,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.semantics { contentDescription = "${state.sortedCount} de ${state.total} canciones revisadas" },
+                )
+                if (state.pendingSync > 0) {
+                    Icon(
+                        AppIcons.Sync,
+                        contentDescription = "${state.pendingSync} cambios pendientes de sincronizar",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(start = 8.dp).size(14.dp),
+                    )
+                    Text(" ${state.pendingSync}", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
         }
-        if (state.pendingSync > 0) {
-            Text(
-                "⟳ ${state.pendingSync}",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier
-                    .padding(end = 8.dp)
-                    .semantics { contentDescription = "${state.pendingSync} cambios pendientes de sincronizar" },
-            )
-        }
-        if (state.total > 0) {
-            // Reviewed / total (including earlier sessions); "+" while more pages are loading.
-            Text(
-                "✓ ${state.sortedCount}/${state.total}${if (state.isLoadingMore) "+" else ""}",
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        TextButton(onClick = actions.onOpenList, enabled = state.total > 0) { Text("☰") }
-        TextButton(onClick = actions.onUndo, enabled = state.canUndo) { Text("↶") }
-        TextButton(onClick = actions.onOpenSettings) { Text("⚙") }
+        IconButton(onClick = actions.onOpenList, enabled = state.total > 0) { Icon(AppIcons.Queue, contentDescription = "Lista de canciones") }
+        IconButton(onClick = actions.onUndo, enabled = state.canUndo) { Icon(AppIcons.Undo, contentDescription = "Deshacer") }
+        IconButton(onClick = actions.onOpenSettings) { Icon(AppIcons.Tune, contentDescription = "Ajustes") }
     }
 }
 
 @Composable
-private fun GestureArea(state: SwipeUiState, track: Track, actions: SwipeActions, modifier: Modifier = Modifier) {
+private fun GestureArea(
+    state: SwipeUiState,
+    track: Track,
+    actions: SwipeActions,
+    modifier: Modifier = Modifier,
+    onCoverColor: (Color?) -> Unit = {},
+) {
     val scope = rememberCoroutineScope()
     val haptics = LocalHapticFeedback.current
     val density = LocalDensity.current
@@ -331,10 +359,21 @@ private fun GestureArea(state: SwipeUiState, track: Track, actions: SwipeActions
                 ?.offset
                 ?.takeIf { it.length >= config.touchSlop * 3 }
                 ?.let { layout.sectorOf(it) }
+            // A hint of the next card underneath, so the queue feels like a deck.
+            if (state.position + 1 < state.total) {
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .padding(start = CardInset + 14.dp, top = CardInset + 14.dp, end = CardInset + 14.dp, bottom = CardInset + 22.dp - 10.dp)
+                        .graphicsLayer { alpha = if (gesture is GestureState.Wheel) 0.3f else 1f }
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f), RoundedCornerShape(CardCorner)),
+                )
+            }
             TrackCard(
                 track = track,
                 state = state,
                 actions = actions,
+                onCoverColor = onCoverColor,
                 modifier = Modifier
                     .fillMaxSize()
                     // Inside the contour line (see EdgeGlow), leaving room at the bottom for the hint.
@@ -388,7 +427,13 @@ private fun GestureFeedback.hapticType(): HapticFeedbackType = when (this) {
 }
 
 @Composable
-private fun TrackCard(track: Track, state: SwipeUiState, actions: SwipeActions, modifier: Modifier = Modifier) {
+private fun TrackCard(
+    track: Track,
+    state: SwipeUiState,
+    actions: SwipeActions,
+    modifier: Modifier = Modifier,
+    onCoverColor: (Color?) -> Unit = {},
+) {
     // Every gesture is also reachable from TalkBack's actions menu.
     val a11yActions = buildList {
         add(CustomAccessibilityAction("Omitir") { actions.onSkip(); true })
@@ -418,11 +463,22 @@ private fun TrackCard(track: Track, state: SwipeUiState, actions: SwipeActions, 
             contentAlignment = Alignment.Center,
         ) {
             if (track.album.imageUrl != null) {
+                val context = LocalContext.current
+                val request = remember(track.album.imageUrl) {
+                    // Software bitmap so its colours can be read for the background tint.
+                    ImageRequest.Builder(context).data(track.album.imageUrl).allowHardware(false).build()
+                }
                 AsyncImage(
-                    model = track.album.imageUrl,
+                    model = request,
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize(),
+                    onSuccess = { success ->
+                        Palette.from(success.result.image.toBitmap()).generate { palette ->
+                            val rgb = palette?.vibrantSwatch?.rgb ?: palette?.dominantSwatch?.rgb
+                            onCoverColor(rgb?.let(::Color))
+                        }
+                    },
                 )
             } else {
                 Text(track.album.name, style = MaterialTheme.typography.headlineSmall, color = Color.White.copy(alpha = 0.85f))
@@ -446,10 +502,11 @@ private fun TrackCard(track: Track, state: SwipeUiState, actions: SwipeActions, 
                 )
             }
             if (state.canLike) {
-                Text(
-                    if (state.isLiked) "♥" else "♡",
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = if (state.isLiked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                Icon(
+                    if (state.isLiked) AppIcons.Heart else AppIcons.HeartOutline,
+                    contentDescription = if (state.isLiked) "En Me gusta" else "No está en Me gusta",
+                    tint = if (state.isLiked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(28.dp),
                 )
             }
         }
@@ -492,31 +549,52 @@ private fun TutorialCard(step: TutorialStep, canLike: Boolean, onSkip: () -> Uni
     }
 }
 
-/** Progress plus the bottom controls: skip (left), play/pause (centre), add playlist (right). */
+/** Progress plus the bottom controls: skip (left), play/pause (centre, big), add playlist (right). */
 @Composable
 private fun BottomBar(state: SwipeUiState, actions: SwipeActions, onAddDestination: () -> Unit) {
     val player = state.player
     val duration = player.durationMs
-    Column(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 12.dp)) {
-        LinearProgressIndicator(
-            progress = { if (duration > 0) player.positionMs.toFloat() / duration else 0f },
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(formatTime(player.positionMs), style = MaterialTheme.typography.labelSmall)
-            Text(formatTime(duration), style = MaterialTheme.typography.labelSmall)
+    Column(Modifier.padding(start = 20.dp, end = 20.dp, bottom = 16.dp, top = 4.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(formatTime(player.positionMs), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            LinearProgressIndicator(
+                progress = { if (duration > 0) player.positionMs.toFloat() / duration else 0f },
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(horizontal = 10.dp),
+                trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                drawStopIndicator = {},
+            )
+            Text(formatTime(duration), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Row(
-            Modifier.fillMaxWidth(),
+            Modifier
+                .fillMaxWidth()
+                .padding(top = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
+            horizontalArrangement = Arrangement.SpaceEvenly,
         ) {
-            OutlinedButton(onClick = actions.onSkip) { Text("✕ Omitir") }
-            TextButton(onClick = actions.onTogglePlayback) {
-                Text(if (player.isPlaying) "❚❚ Pausa" else "▶ Reproducir")
+            RoundAction(AppIcons.Skip, "Omitir", actions.onSkip)
+            FilledIconButton(
+                onClick = actions.onTogglePlayback,
+                modifier = Modifier.size(68.dp),
+            ) {
+                Icon(
+                    if (player.isPlaying) AppIcons.Pause else AppIcons.Play,
+                    contentDescription = if (player.isPlaying) "Pausar" else "Reproducir",
+                    modifier = Modifier.size(34.dp),
+                )
             }
-            Button(onClick = onAddDestination) { Text("+ Playlist") }
+            RoundAction(AppIcons.Add, "Playlist", onAddDestination)
         }
+    }
+}
+
+@Composable
+private fun RoundAction(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, onClick: () -> Unit) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        OutlinedIconButton(onClick = onClick, modifier = Modifier.size(52.dp)) { Icon(icon, contentDescription = label) }
+        Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp))
     }
 }
 

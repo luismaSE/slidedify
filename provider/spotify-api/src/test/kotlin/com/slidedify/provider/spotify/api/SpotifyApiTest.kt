@@ -249,6 +249,13 @@ class SpotifyApiTest {
         assertNull(player.state.value.error)
     }
 
+    @Test
+    fun `writer reports what a playlist already has`() = runTest {
+        signedIn()
+        respond(body = """{"items":[{"item":${trackJson("1")}},{"item":${trackJson("2")}}]}""")
+        assertEquals(setOf(TrackId("1"), TrackId("2")), SpotifyLibraryWriter(api).playlistTrackIds(PlaylistId("pl")))
+    }
+
     class MemoryTokenStore : TokenStore {
         var tokens: SpotifyTokens? = null
 

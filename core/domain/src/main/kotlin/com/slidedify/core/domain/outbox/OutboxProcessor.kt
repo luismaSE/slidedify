@@ -10,7 +10,8 @@ import kotlinx.coroutines.CancellationException
 /**
  * Removes writes that cancel each other before they reach the network:
  * - "add to playlist" followed by "remove" of the same track/playlist (an undo before syncing) → both dropped;
- * - several "like" changes on the same track → only the last one is kept.
+ * - several "like" changes on the same track → only the last one is kept;
+ * - the same "add to playlist" queued twice → only one is kept.
  *
  * Returns the writes to keep (in order) and the ids that can be deleted without syncing.
  */
@@ -25,7 +26,12 @@ object OutboxCompactor {
 
         for (write in pending) {
             when (val op = write.op) {
-                is WriteOp.AddToPlaylist -> openAdds[Triple(op.provider, op.playlist, op.track)] = write
+                is WriteOp.AddToPlaylist -> {
+                    // The same add queued twice (e.g. a combo plus a single destination with the same
+                    // playlist, or re-sorting a track from the list): keep only the first one.
+                    val key = Triple(op.provider, op.playlist, op.track)
+                    if (key in openAdds) drop += write.id else openAdds[key] = write
+                }
                 is WriteOp.RemoveFromPlaylist -> {
                     val add = openAdds.remove(Triple(op.provider, op.playlist, op.track))
                     if (add != null) {
@@ -100,6 +106,8 @@ class OutboxProcessor(
 
         var sent = 0
         var discarded = compacted.drop.size
+        // What each destination playlist already contains, read once per run (lazily).
+        val contents = mutableMapOf<Pair<ProviderId, PlaylistId>, MutableSet<TrackId>?>()
         for (batch in OutboxBatcher.batches(compacted.keep, maxPerBatch)) {
             val writer = writerFor(batch.provider)
             if (writer == null) {
@@ -110,7 +118,15 @@ class OutboxProcessor(
             }
             try {
                 when (val kind = batch.kind) {
-                    is WriteBatch.Kind.Add -> writer.addToPlaylist(kind.playlist, batch.tracks)
+                    is WriteBatch.Kind.Add -> {
+                        val key = batch.provider to kind.playlist
+                        val existing = if (key in contents) contents[key] else writer.playlistTrackIds(kind.playlist)?.toMutableSet().also { contents[key] = it }
+                        val fresh = batch.tracks.distinct().filterNot { existing?.contains(it) == true }
+                        if (fresh.isNotEmpty()) writer.addToPlaylist(kind.playlist, fresh)
+                        existing?.addAll(fresh)
+                        discarded += batch.tracks.size - fresh.size
+                        sent -= batch.tracks.size - fresh.size // counted below as part of the batch
+                    }
                     is WriteBatch.Kind.Remove -> writer.removeFromPlaylist(kind.playlist, batch.tracks)
                     is WriteBatch.Kind.Like -> writer.setLiked(batch.tracks, kind.liked)
                 }

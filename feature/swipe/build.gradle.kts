@@ -30,6 +30,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.savedstate)
     implementation(libs.androidx.hilt.navigation.compose)
     implementation(libs.coil.compose)
+    implementation(libs.androidx.palette)
     implementation(libs.coil.network.okhttp)
 
     implementation(libs.hilt.android)

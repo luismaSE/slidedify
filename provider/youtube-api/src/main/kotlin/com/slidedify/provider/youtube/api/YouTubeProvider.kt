@@ -243,6 +243,12 @@ class YouTubeLibraryWriter(private val api: YouTubeApi) : LibraryWriter {
         api.removeFromPlaylist(playlist.value, tracks.map { it.value })
 
     override suspend fun setLiked(tracks: List<TrackId>, liked: Boolean) = api.rate(tracks.map { it.value }, liked)
+
+    override suspend fun playlistTrackIds(playlist: PlaylistId): Set<TrackId> {
+        val ids = HashSet<TrackId>()
+        api.playlistPages(playlist.value).collect { page -> page.mapTo(ids) { it.id } }
+        return ids
+    }
 }
 
 /** Signed-in state; the token itself comes from Google Play Services on Android. */

@@ -105,6 +105,9 @@ class SpotifyLibraryWriter(private val api: SpotifyWebApi) : LibraryWriter {
         api.removeFromPlaylist(playlist.value, tracks.map(::trackUri))
 
     override suspend fun setLiked(tracks: List<TrackId>, liked: Boolean) = api.setSaved(tracks.map(::trackUri), liked)
+
+    override suspend fun playlistTrackIds(playlist: PlaylistId): Set<TrackId> =
+        api.playlistTracks(playlist.value).mapNotNullTo(HashSet()) { dto -> dto.id?.let(::TrackId) }
 }
 
 /**

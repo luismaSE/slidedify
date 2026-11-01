@@ -96,8 +96,14 @@ class OutboxTest {
         }
     }
 
-    private class RecordingWriter(private val failOnCall: Int = -1) : LibraryWriter {
+    private class RecordingWriter(
+        private val failOnCall: Int = -1,
+        private val inPlaylists: Map<PlaylistId, Set<TrackId>>? = null,
+    ) : LibraryWriter {
         val calls = mutableListOf<String>()
+
+        override suspend fun playlistTrackIds(playlist: PlaylistId): Set<TrackId>? =
+            inPlaylists?.let { it[playlist].orEmpty() }
 
         private fun record(call: String) {
             if (calls.size == failOnCall) error("network down")
@@ -169,5 +175,38 @@ class OutboxTest {
         repository.apply(com.slidedify.core.domain.session.LibraryEffect.AddToPlaylists(track, setOf(gym, focus)))
         assertEquals(2, store.rows.size)
         assertEquals(1, scheduled)
+    }
+
+    @Test
+    fun `the same add queued twice is sent once`() {
+        val result = OutboxCompactor.compact(listOf(add(1, 1), add(2, 1)))
+        assertEquals(listOf(add(1, 1)), result.keep)
+        assertEquals(setOf(2L), result.drop)
+    }
+
+    @Test
+    fun `tracks already in the playlist are not added again`() = runTest {
+        val store = MemoryStore(
+            listOf(
+                WriteOp.AddToPlaylist(spotify, gym, t(1)), // already there
+                WriteOp.AddToPlaylist(spotify, gym, t(2)),
+            ),
+        )
+        val writer = RecordingWriter(inPlaylists = mapOf(gym to setOf(t(1))))
+
+        val result = OutboxProcessor(store, { writer }, { 100 }).process()
+
+        assertEquals(listOf("add gym [t2]"), writer.calls)
+        assertEquals(OutboxProcessor.Result.Done(sent = 1, discarded = 1), result)
+        assertTrue(store.rows.isEmpty())
+    }
+
+    @Test
+    fun `when everything is already there nothing is sent`() = runTest {
+        val store = MemoryStore(listOf(WriteOp.AddToPlaylist(spotify, gym, t(1))))
+        val writer = RecordingWriter(inPlaylists = mapOf(gym to setOf(t(1))))
+        OutboxProcessor(store, { writer }, { 100 }).process()
+        assertTrue(writer.calls.isEmpty())
+        assertTrue(store.rows.isEmpty())
     }
 }
