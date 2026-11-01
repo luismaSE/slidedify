@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -20,6 +19,8 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -101,6 +102,8 @@ data class SwipeActions(
     val onOpenSettings: () -> Unit = {},
     val onRetry: () -> Unit = {},
     val onRestart: () -> Unit = {},
+    val onOpenList: () -> Unit = {},
+    val onJumpTo: (Int) -> Unit = {},
 )
 
 @Composable
@@ -143,6 +146,7 @@ fun SwipeRoute(onBack: () -> Unit, onOpenSettings: () -> Unit, viewModel: SwipeV
             onOpenSettings = onOpenSettings,
             onRetry = viewModel::load,
             onRestart = viewModel::restart,
+            onJumpTo = viewModel::jumpTo,
         ),
     )
 }
@@ -151,6 +155,8 @@ fun SwipeRoute(onBack: () -> Unit, onOpenSettings: () -> Unit, viewModel: SwipeV
 fun SwipeScreen(state: SwipeUiState, actions: SwipeActions, notice: String? = null) {
     val buttonMode = rememberButtonModeActive(state.settings.buttonMode)
     var showLyrics by remember { mutableStateOf(false) }
+    var showList by remember { mutableStateOf(false) }
+    val screenActions = actions.copy(onOpenList = { showList = true })
     var showAddDestination by remember { mutableStateOf(false) }
 
     Scaffold(containerColor = MaterialTheme.colorScheme.background) { padding ->
@@ -159,7 +165,7 @@ fun SwipeScreen(state: SwipeUiState, actions: SwipeActions, notice: String? = nu
                 .fillMaxSize()
                 .padding(padding),
         ) {
-            TopBar(state, actions)
+            TopBar(state, screenActions)
             notice?.let {
                 Text(
                     it,
@@ -177,7 +183,7 @@ fun SwipeScreen(state: SwipeUiState, actions: SwipeActions, notice: String? = nu
                     val track = state.current ?: return@Column
                     if (buttonMode) {
                         Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                            TrackCard(track, state, actions, Modifier.padding(horizontal = 24.dp))
+                            TrackCard(track, state, actions, Modifier.fillMaxSize().padding(CardInset))
                         }
                         ButtonPanel(track, state, actions)
                     } else {
@@ -193,6 +199,16 @@ fun SwipeScreen(state: SwipeUiState, actions: SwipeActions, notice: String? = nu
     val lyrics = state.lyrics
     if (showLyrics && lyrics is LyricsState.Available) {
         LyricsSheet(lyrics.lyrics, state.player.positionMs, onDismiss = { showLyrics = false })
+    }
+    if (showList) {
+        TrackListSheet(
+            state = state,
+            onPick = { index ->
+                actions.onJumpTo(index)
+                showList = false
+            },
+            onDismiss = { showList = false },
+        )
     }
     if (showAddDestination) {
         AddDestinationSheet(
@@ -237,16 +253,15 @@ private fun TopBar(state: SwipeUiState, actions: SwipeActions) {
                     .semantics { contentDescription = "${state.pendingSync} cambios pendientes de sincronizar" },
             )
         }
-        if (state.total > 0 || state.sortedBefore > 0) {
-            // Includes tracks sorted in earlier sessions; "+" while more pages are loading.
-            val done = state.sortedBefore + state.position
-            val total = state.sortedBefore + state.total
+        if (state.total > 0) {
+            // Reviewed / total (including earlier sessions); "+" while more pages are loading.
             Text(
-                "${(done + 1).coerceAtMost(total)}/$total${if (state.isLoadingMore) "+" else ""}",
+                "✓ ${state.sortedCount}/${state.total}${if (state.isLoadingMore) "+" else ""}",
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+        TextButton(onClick = actions.onOpenList, enabled = state.total > 0) { Text("☰") }
         TextButton(onClick = actions.onUndo, enabled = state.canUndo) { Text("↶") }
         TextButton(onClick = actions.onOpenSettings) { Text("⚙") }
     }
@@ -328,8 +343,9 @@ private fun GestureArea(state: SwipeUiState, track: Track, actions: SwipeActions
                 state = state,
                 actions = actions,
                 modifier = Modifier
-                    .align(Alignment.Center)
-                    .padding(horizontal = 24.dp)
+                    .fillMaxSize()
+                    // Inside the contour line (see EdgeGlow), leaving room at the bottom for the hint.
+                    .padding(start = CardInset, top = CardInset, end = CardInset, bottom = CardInset + 22.dp)
                     .graphicsLayer {
                         translationX = cardOffset.value.x
                         translationY = cardOffset.value.y
@@ -354,7 +370,7 @@ private fun GestureArea(state: SwipeUiState, track: Track, actions: SwipeActions
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
-                        .padding(bottom = 8.dp),
+                        .padding(bottom = ContourInset + 10.dp),
                 )
             }
 
@@ -393,19 +409,18 @@ private fun TrackCard(track: Track, state: SwipeUiState, actions: SwipeActions, 
     }
     Card(
         modifier = modifier
-            .fillMaxWidth()
             .semantics(mergeDescendants = true) {
                 contentDescription = "${track.title}, de ${track.artistNames}, álbum ${track.album.name}"
                 customActions = a11yActions
             },
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(CardCorner),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
     ) {
         Box(
             Modifier
                 .fillMaxWidth()
-                .aspectRatio(1f)
-                .clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
+                .weight(1f)
+                .clip(RoundedCornerShape(topStart = CardCorner, topEnd = CardCorner))
                 .background(placeholderBrush(track)),
             contentAlignment = Alignment.Center,
         ) {
@@ -577,6 +592,66 @@ private fun AddDestinationSheet(
                         modifier = Modifier.clickable { onPick(playlist) },
                     )
                 }
+            }
+        }
+    }
+}
+
+/** Card geometry, aligned with the contour line drawn by [EdgeGlow]. */
+private val CardInset = ContourInset + 8.dp
+private val CardCorner = ContourCorner - 8.dp
+
+/**
+ * Whole queue of the source with its state: ✓ reviewed, ○ pending, ▶ current.
+ * Tapping a track continues sorting from there.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TrackListSheet(state: SwipeUiState, onPick: (Int) -> Unit, onDismiss: () -> Unit) {
+    val listState = rememberLazyListState()
+    LaunchedEffect(Unit) { listState.scrollToItem((state.position - 2).coerceAtLeast(0)) }
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Text(
+            "${state.sourceName} · ✓ ${state.sortedCount} de ${state.total}${if (state.isLoadingMore) " (cargando…)" else ""}",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+        )
+        LazyColumn(state = listState, modifier = Modifier.fillMaxWidth()) {
+            itemsIndexed(state.queue, key = { _, track -> track.id.value }) { index, track ->
+                val isCurrent = index == state.position
+                val reviewed = track.id in state.sortedIds
+                ListItem(
+                    leadingContent = {
+                        Text(
+                            when {
+                                isCurrent -> "▶"
+                                reviewed -> "✓"
+                                else -> "○"
+                            },
+                            color = when {
+                                isCurrent -> MaterialTheme.colorScheme.primary
+                                reviewed -> MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
+                                else -> MaterialTheme.colorScheme.onSurfaceVariant
+                            },
+                            fontWeight = FontWeight.Bold,
+                        )
+                    },
+                    headlineContent = {
+                        Text(
+                            track.title,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal,
+                        )
+                    },
+                    supportingContent = { Text(track.artistNames, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    modifier = Modifier
+                        .clickable(onClickLabel = "Seguir desde esta canción") { onPick(index) }
+                        .semantics {
+                            contentDescription = "${track.title}, ${if (reviewed) "revisada" else "pendiente"}"
+                        },
+                )
             }
         }
     }

@@ -330,7 +330,8 @@ class SwipeViewModelTest {
         collect(vm)
 
         assertEquals(tracks[1], vm.uiState.value.current)
-        assertEquals(1, vm.uiState.value.sortedBefore)
+        assertEquals(1, vm.uiState.value.sortedCount)
+        assertEquals(3, vm.uiState.value.queue.size) // reviewed tracks stay in the list
 
         vm.onSkip()
         assertTrue(("liked" to tracks[1].id) in progress.sorted)
@@ -347,7 +348,18 @@ class SwipeViewModelTest {
         vm.restart()
 
         assertEquals(tracks[0], vm.uiState.value.current)
-        assertEquals(0, vm.uiState.value.sortedBefore)
+        assertEquals(0, vm.uiState.value.sortedCount)
+    }
+
+    @Test
+    fun `jumping from the list continues from that track`() = runTest(dispatcher) {
+        val vm = viewModel()
+        collect(vm)
+
+        vm.jumpTo(2)
+
+        assertEquals(tracks[2], vm.uiState.value.current)
+        assertEquals(tracks[2], player.state.value.track)
     }
 
     private class MemoryProgress : com.slidedify.core.domain.repository.SortProgressRepository {

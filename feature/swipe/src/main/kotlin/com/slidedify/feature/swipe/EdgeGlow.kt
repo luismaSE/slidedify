@@ -32,6 +32,10 @@ import kotlin.math.cos
 import kotlin.math.hypot
 import kotlin.math.sin
 
+/** Distance of the contour line from the screen edge, and its corner radius (the card aligns to these). */
+internal val ContourInset = 10.dp
+internal val ContourCorner = 28.dp
+
 /** A swipe zone as seen from the centre of the screen. */
 internal data class Zone(val sector: Sector, val centerDegrees: Float, val halfWidth: Float, val color: Color, val label: String)
 
@@ -51,8 +55,8 @@ internal fun EdgeGlow(zones: List<Zone>, hovered: Sector?, modifier: Modifier = 
     val textMeasurer = rememberTextMeasurer()
     Canvas(modifier) {
         val center = Offset(size.width / 2f, size.height / 2f)
-        val inset = 10.dp.toPx()
-        val contour = RoundRect(inset, inset, size.width - inset, size.height - inset, CornerRadius(28.dp.toPx()))
+        val inset = ContourInset.toPx()
+        val contour = RoundRect(inset, inset, size.width - inset, size.height - inset, CornerRadius(ContourCorner.toPx()))
         zones.forEach { zone ->
             val isHovered = zone.sector == hovered
             val alpha = when {
