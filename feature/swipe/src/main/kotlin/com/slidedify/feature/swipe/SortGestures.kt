@@ -25,7 +25,8 @@ import kotlinx.coroutines.CancellationException
 /** Visual radius of the wheel; the activation radius is much smaller so gestures stay short. */
 val WheelRadius = 112.dp
 val WheelActivationRadius = 48.dp
-private val WheelResetRadius = 32.dp
+/** Coming back inside this radius re-arms the next toggle (select or deselect). Generous so it's easy. */
+private val WheelResetRadius = 36.dp
 
 @Composable
 fun rememberGestureConfig(destinationCount: Int, holdTimeoutMs: Long, mirrored: Boolean): GestureConfig {

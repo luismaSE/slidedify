@@ -189,6 +189,21 @@ class GestureReducerTest {
     }
 
     @Test
+    fun `touching cancel clears the selection instantly and the wheel stays open to redo it`() {
+        val steps = run(
+            moveBy(up), moveBy(center),
+            moveBy(right), moveBy(center),
+            moveBy(lowerLeft), // clears both
+            moveBy(center),
+            moveBy(down), // pick again
+            upBy(down),
+            from = wheelState(),
+        )
+        assertEquals(emptySet(), (steps[4].state as GestureState.Wheel).selected)
+        assertEquals(GestureOutcome.WheelCommit(setOf(DOWN)), steps.last().outcome)
+    }
+
+    @Test
     fun `releasing on the upper left skips the track`() {
         val steps = run(moveBy(up), moveBy(center), moveBy(upperLeft), upBy(upperLeft), from = wheelState())
         assertEquals(GestureFeedback.EnteredSkip, steps[2].feedback)

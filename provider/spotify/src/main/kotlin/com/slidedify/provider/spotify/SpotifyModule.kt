@@ -56,12 +56,11 @@ class SpotifyComponents @Inject constructor(
     val tokens = TokenProvider(tokenStore, authClient)
     private val api = SpotifyWebApi(client, tokens)
 
-    /** Full track via the Spotify app (App Remote); 30 s previews when that isn't possible. */
-    private val player = SpotifyPlaybackChain(
-        full = AppRemotePlayer(context, config.clientId, config.redirectUri, scope),
-        preview = PreviewPlayer(previewSource),
-        scope = scope,
-    )
+    /**
+     * 30 s previews (Shazam-style). Full-track control of the Spotify app proved unreliable, and a
+     * preview is enough to decide where a song goes.
+     */
+    private val player = PreviewPlayer(previewSource)
 
     val provider = SpotifyMusicProvider(
         auth = SpotifyProviderAuth(tokens, api),

@@ -162,6 +162,9 @@ class GestureReducer(private val config: GestureConfig) {
         if ((sector == Sector.Cancel || sector == Sector.Skip) && state.hovered != sector) {
             armed = false
             feedback = if (sector == Sector.Cancel) GestureFeedback.EnteredCancel else GestureFeedback.EnteredSkip
+            // Touching "Cancelar" clears every selection at once, so a mistake can be redone
+            // without releasing: go back to the centre and pick again.
+            if (sector == Sector.Cancel) selected = emptySet()
         }
 
         val next = state.copy(current = position, selected = selected, armed = armed, hovered = sector)

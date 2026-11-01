@@ -61,7 +61,6 @@ androidx-room-runtime = { module = "androidx.room:room-runtime", version.ref = "
 androidx-room-ktx = { module = "androidx.room:room-ktx", version.ref = "room" }
 androidx-room-compiler = { module = "androidx.room:room-compiler", version.ref = "room" }
 androidx-work-runtime = { module = "androidx.work:work-runtime-ktx", version.ref = "work" }
-spotify-app-remote = { module = "com.spotify.android:app-remote", version = "0.8.0" }
 spotify-auth = { module = "com.spotify.android:auth", version.ref = "spotifyAuth" }
 androidx-browser = { module = "androidx.browser:browser", version.ref = "browser" }
 androidx-navigation-compose = { module = "androidx.navigation:navigation-compose", version.ref = "navigation" }

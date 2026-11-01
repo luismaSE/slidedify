@@ -74,7 +74,6 @@ import com.slidedify.core.domain.gesture.GestureState
 import com.slidedify.core.domain.gesture.GestureStep
 import com.slidedify.core.domain.gesture.SectorLayout
 import com.slidedify.core.domain.gesture.TapKind
-import com.slidedify.core.domain.player.PlayerError
 import com.slidedify.core.model.GestureMap
 import com.slidedify.core.model.Playlist
 import com.slidedify.core.model.Slot
@@ -512,24 +511,6 @@ private fun BottomBar(state: SwipeUiState, actions: SwipeActions, onAddDestinati
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(formatTime(player.positionMs), style = MaterialTheme.typography.labelSmall)
             Text(formatTime(duration), style = MaterialTheme.typography.labelSmall)
-        }
-        if (player.error == null && (player.isPreview || player.notice != null)) {
-            Text(
-                player.notice ?: "Vista previa de 30 s",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        player.error?.let { error ->
-            Text(
-                when (error) {
-                    PlayerError.PremiumRequired -> "La reproducción necesita una cuenta Premium."
-                    PlayerError.SpotifyNotInstalled -> "Instalá la app del servicio para reproducir."
-                    is PlayerError.Disconnected -> error.message ?: "No se pudo reproducir."
-                },
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.error,
-            )
         }
         Row(
             Modifier.fillMaxWidth(),

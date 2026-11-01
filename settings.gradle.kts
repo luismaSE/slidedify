@@ -17,11 +17,6 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
-        // Vendored SDKs that are not published to any public repository (see third_party/).
-        maven {
-            url = uri("third_party/maven")
-            content { includeModule("com.spotify.android", "app-remote") }
-        }
     }
 }
 
