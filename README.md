@@ -4,10 +4,11 @@ App Android para ordenar canciones de Spotify en varias playlists con gestos tip
 una canción por pantalla, se reproduce sola, y cada gesto la manda a la playlist configurada.
 
 - Swipe hacia un destino lo agrega a esa playlist. El círculo se reparte en partes iguales entre las
-  playlists y una zona de cancelar (1 playlist: mitades, 2: tercios, 3: cuartos… máximo 8).
+  playlists y una zona de **omitir** (1 playlist: mitades, 2: tercios, 3: cuartos… máximo 8).
+  El borde de la pantalla se ilumina con el color de cada zona; al arrastrar, el nombre aparece en la zona.
 - **✕ Omitir** abajo a la izquierda, **+ Playlist** abajo a la derecha (agregar o crear destinos).
 - **Mantener presionado** abre una rueda tipo joystick donde está el dedo: empujar y volver al centro
-  marca varias playlists; soltar las confirma; soltar en ✕ cancela.
+  marca varias playlists; soltar las confirma. La zona izquierda se divide en Omitir (arriba) y Cancelar (abajo).
 - Doble tap ♥ Me gusta · tap play/pausa · ↶ deshacer.
 
 📄 Propuesta de diseño, stack y arquitectura: [docs/PROPUESTA.md](docs/PROPUESTA.md)

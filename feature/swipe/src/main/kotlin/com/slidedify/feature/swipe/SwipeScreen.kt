@@ -33,10 +33,6 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarDuration
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -69,14 +65,12 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
-import com.slidedify.core.designsystem.CancelColor
 import com.slidedify.core.designsystem.color
 import com.slidedify.core.domain.gesture.DoubleTapDetector
 import com.slidedify.core.domain.gesture.GestureFeedback
 import com.slidedify.core.domain.gesture.GestureOutcome
 import com.slidedify.core.domain.gesture.GestureState
 import com.slidedify.core.domain.gesture.GestureStep
-import com.slidedify.core.domain.gesture.Sector
 import com.slidedify.core.domain.gesture.SectorLayout
 import com.slidedify.core.domain.gesture.TapKind
 import com.slidedify.core.domain.player.PlayerError
@@ -111,34 +105,28 @@ data class SwipeActions(
 @Composable
 fun SwipeRoute(onBack: () -> Unit, onOpenSettings: () -> Unit, viewModel: SwipeViewModel = hiltViewModel()) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    val snackbar = remember { SnackbarHostState() }
+    var notice by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(viewModel) {
         viewModel.events.collect { event ->
-            snackbar.currentSnackbarData?.dismiss()
-            val (message, undoable) = when (event) {
-                is SwipeEvent.Added -> "Agregada a ${event.playlistNames.joinToString(", ")}" to true
-                SwipeEvent.Skipped -> "Omitida" to true
-                is SwipeEvent.LikeChanged -> (if (event.liked) "♥ Agregada a Me gusta" else "Quitada de Me gusta") to true
-                SwipeEvent.Undone -> "Deshecho" to false
-                is SwipeEvent.DestinationAdded -> "\"${event.playlistName}\" se sumó al círculo" to false
-                SwipeEvent.DestinationsFull -> "Máximo ${GestureMap.MAX_DESTINATIONS} destinos. Usá combos en Ajustes." to false
-                is SwipeEvent.Error -> event.message to false
-            }
+            // Successful actions are already visible (card moves, ♥, circle); no toasts or snackbars
+            // that would cover the bottom buttons. Only problems get a short notice in the top bar.
+            notice = when (event) {
+                SwipeEvent.DestinationsFull -> "Máximo ${GestureMap.MAX_DESTINATIONS} destinos"
+                is SwipeEvent.Error -> event.message
+                else -> null
+            } ?: return@collect
             launch {
-                val result = snackbar.showSnackbar(
-                    message = message,
-                    actionLabel = if (undoable) "Deshacer" else null,
-                    duration = SnackbarDuration.Short,
-                )
-                if (result == SnackbarResult.ActionPerformed) viewModel.onUndo()
+                val shown = notice
+                delay(3_000)
+                if (notice == shown) notice = null
             }
         }
     }
 
     SwipeScreen(
         state = state,
-        snackbar = snackbar,
+        notice = notice,
         actions = SwipeActions(
             onSwipe = viewModel::onSwipe,
             onSkip = viewModel::onSkip,
@@ -158,21 +146,26 @@ fun SwipeRoute(onBack: () -> Unit, onOpenSettings: () -> Unit, viewModel: SwipeV
 }
 
 @Composable
-fun SwipeScreen(state: SwipeUiState, snackbar: SnackbarHostState, actions: SwipeActions) {
+fun SwipeScreen(state: SwipeUiState, actions: SwipeActions, notice: String? = null) {
     val buttonMode = rememberButtonModeActive(state.settings.buttonMode)
     var showLyrics by remember { mutableStateOf(false) }
     var showAddDestination by remember { mutableStateOf(false) }
 
-    Scaffold(
-        snackbarHost = { SnackbarHost(snackbar) },
-        containerColor = MaterialTheme.colorScheme.background,
-    ) { padding ->
+    Scaffold(containerColor = MaterialTheme.colorScheme.background) { padding ->
         Column(
             Modifier
                 .fillMaxSize()
                 .padding(padding),
         ) {
             TopBar(state, actions)
+            notice?.let {
+                Text(
+                    it,
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.labelMedium,
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                )
+            }
             when {
                 state.loadError != null -> LoadError(state.loadError, actions, Modifier.fillMaxSize())
                 state.isLoading -> Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() }
@@ -301,6 +294,13 @@ private fun GestureArea(state: SwipeUiState, track: Track, actions: SwipeActions
                     cardOffset.snapTo(Offset.Zero)
                 }
 
+                GestureOutcome.Skip -> scope.launch {
+                    (previous as? GestureState.Dragging)?.let { cardOffset.snapTo(it.offset.toOffset()) }
+                    cardOffset.animateTo(flyOutTarget(layout.extraCenter, flyDistance), tween(180))
+                    actions.onSkip()
+                    cardOffset.snapTo(Offset.Zero)
+                }
+
                 GestureOutcome.SwipeAborted -> scope.launch { cardOffset.animateTo(Offset.Zero, spring()) }
                 is GestureOutcome.WheelCommit -> actions.onWheelCommit(outcome.slots)
                 GestureOutcome.WheelCancelled, GestureOutcome.WheelDismissed, null -> Unit
@@ -312,6 +312,13 @@ private fun GestureArea(state: SwipeUiState, track: Track, actions: SwipeActions
                 .fillMaxSize()
                 .sortGestures(config) { latestHandleStep(it) },
         ) {
+            val zones = remember(state.targets, layout) { swipeZones(state.targets, layout) }
+            val hoveredZone = (gesture as? GestureState.Dragging)
+                ?.offset
+                ?.takeIf { it.length >= config.touchSlop * 3 }
+                ?.let { layout.sectorOf(it) }
+            EdgeGlow(zones, hoveredZone, Modifier.fillMaxSize())
+
             TrackCard(
                 track = track,
                 state = state,
@@ -326,10 +333,6 @@ private fun GestureArea(state: SwipeUiState, track: Track, actions: SwipeActions
                         alpha = if (gesture is GestureState.Wheel) 0.5f else 1f
                     },
             )
-
-            (gesture as? GestureState.Dragging)?.let { drag ->
-                DragHint(drag, state, layout, config.touchSlop * 3, Modifier.align(Alignment.TopCenter))
-            }
 
             state.tutorialStep?.let { step ->
                 if (gesture == GestureState.Idle) {
@@ -365,35 +368,7 @@ private fun GestureFeedback.hapticType(): HapticFeedbackType = when (this) {
     GestureFeedback.SlotSelected -> HapticFeedbackType.ToggleOn
     GestureFeedback.SlotDeselected -> HapticFeedbackType.ToggleOff
     GestureFeedback.EnteredCancel -> HapticFeedbackType.Reject
-}
-
-/** Shows where the card will go if released now. */
-@Composable
-private fun DragHint(
-    drag: GestureState.Dragging,
-    state: SwipeUiState,
-    layout: SectorLayout,
-    minDistance: Float,
-    modifier: Modifier,
-) {
-    val offset = drag.offset
-    if (offset.length < minDistance) return
-    val (text, color) = when (val sector = layout.sectorOf(offset)) {
-        Sector.Cancel -> "✕ Cancelar" to CancelColor
-        is Sector.Destination -> {
-            val target = state.target(sector.slot) ?: return
-            target.label to sector.slot.color()
-        }
-
-        null -> return
-    }
-    Surface(
-        modifier = modifier.padding(top = 8.dp),
-        shape = RoundedCornerShape(50),
-        color = color.copy(alpha = 0.9f),
-    ) {
-        Text(text, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp), color = Color.Black, fontWeight = FontWeight.Bold)
-    }
+    GestureFeedback.EnteredSkip -> HapticFeedbackType.SegmentTick
 }
 
 @Composable
@@ -479,10 +454,10 @@ private fun placeholderBrush(track: Track): Brush {
 private fun TutorialCard(step: TutorialStep, canLike: Boolean, onSkip: () -> Unit, modifier: Modifier = Modifier) {
     val (title, body) = when (step) {
         TutorialStep.Swipe -> "1/3 · Deslizá" to
-            "Deslizá hacia una playlist para agregarla. ✕ Omitir (abajo a la izquierda) pasa a la siguiente; " +
+            "Deslizá hacia el color de una playlist para agregarla, o hacia la zona gris para omitir. " +
             "+ Playlist (abajo a la derecha) suma destinos. Deshacé con ↶."
         TutorialStep.Wheel -> "2/3 · Mantené presionado" to
-            "Aparece la rueda. Empujá el pulgar hacia una playlist y volvé al centro para marcar varias. Soltá para confirmar; soltá en ✕ para cancelar."
+            "Aparece la rueda. Empujá el pulgar hacia una playlist y volvé al centro para marcar varias. Soltá para confirmar. A la izquierda: Omitir (arriba) y Cancelar (abajo)."
         TutorialStep.DoubleTap -> "3/3 · Doble toque" to
             if (canLike) "Tocá dos veces para agregar a Me gusta. Un toque pausa o reanuda." else "Un toque pausa o reanuda la canción."
     }
@@ -559,7 +534,7 @@ private fun AddDestinationSheet(
         ) {
             Text("Agregar destino", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
             Text(
-                "El círculo se reparte en partes iguales entre las playlists y la zona de cancelar.",
+                "El círculo se reparte en partes iguales entre las playlists y la zona de omitir.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

@@ -188,7 +188,7 @@ fun GestureSettingsScreen(
             item { SectionTitle("Destinos (${state.providerName})") }
             item {
                 Text(
-                    "El círculo se reparte en partes iguales entre los destinos y la zona de cancelar " +
+                    "El círculo se reparte en partes iguales entre los destinos y la zona de omitir " +
                         "(1 destino: mitades, 2: tercios, 3: cuartos…). Cada destino puede agregar a varias playlists (combo).",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,

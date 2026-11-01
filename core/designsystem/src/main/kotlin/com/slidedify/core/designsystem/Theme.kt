@@ -42,6 +42,9 @@ fun arrowFor(degrees: Float): String {
 
 val CancelColor = Color(0xFFFF5A5A)
 
+/** "Omitir" (skip) zone: neutral grey so it never looks like a playlist. */
+val SkipColor = Color(0xFF9AA3B2)
+
 @Composable
 fun SlidedifyTheme(content: @Composable () -> Unit) {
     MaterialTheme(colorScheme = DarkColors, content = content)

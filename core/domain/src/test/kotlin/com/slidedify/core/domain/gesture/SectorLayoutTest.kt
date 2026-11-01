@@ -35,8 +35,8 @@ class SectorLayoutTest {
         assertEquals(dest(0), layout.at(0.0))
         assertEquals(dest(0), layout.at(60.0))
         assertEquals(dest(0), layout.at(300.0))
-        assertEquals(Sector.Cancel, layout.at(180.0))
-        assertEquals(Sector.Cancel, layout.at(120.0))
+        assertEquals(Sector.Skip, layout.at(180.0))
+        assertEquals(Sector.Skip, layout.at(120.0))
         assertNull(layout.at(90.0)) // boundary
     }
 
@@ -48,7 +48,7 @@ class SectorLayoutTest {
         assertEquals(300f, layout.centerOf(Slot(1)))
         assertEquals(dest(0), layout.at(60.0))
         assertEquals(dest(1), layout.at(300.0))
-        assertEquals(Sector.Cancel, layout.at(180.0))
+        assertEquals(Sector.Skip, layout.at(180.0))
     }
 
     @ParameterizedTest(name = "3 playlists: {0}° -> {1}")
@@ -62,22 +62,40 @@ class SectorLayoutTest {
         val layout = SectorLayout(8)
         assertEquals(40f, layout.sectorWidth)
         (0 until 8).forEach { i -> assertEquals(dest(i), layout.at(layout.centerOf(Slot(i)).toDouble())) }
-        assertEquals(Sector.Cancel, layout.at(180.0))
+        assertEquals(Sector.Skip, layout.at(180.0))
     }
 
     @Test
-    fun `no playlists means everything cancels`() {
-        assertEquals(Sector.Cancel, SectorLayout(0).at(0.0))
+    fun `no playlists means every swipe skips`() {
+        assertEquals(Sector.Skip, SectorLayout(0).at(0.0))
         assertNull(SectorLayout(0).sectorOf(Point.Zero))
     }
 
     @Test
     fun `mirrored layout puts cancel on the right`() {
         val layout = SectorLayout(3, mirrored = true)
-        assertEquals(Sector.Cancel, layout.at(0.0))
+        assertEquals(Sector.Skip, layout.at(0.0))
         assertEquals(dest(1), layout.at(180.0))
         assertEquals(dest(0), layout.at(90.0))
-        assertEquals(0f, layout.cancelCenter)
+        assertEquals(0f, layout.extraCenter)
         assertEquals(180f, layout.centerOf(Slot(1)))
+    }
+
+    @Test
+    fun `on the wheel the extra sector splits into skip (upper) and cancel (lower)`() {
+        val layout = SectorLayout(3)
+        assertEquals(Sector.Skip, layout.sectorOf(vectorAt(160.0), wheel = true))
+        assertEquals(Sector.Cancel, layout.sectorOf(vectorAt(200.0), wheel = true))
+        assertNull(layout.sectorOf(vectorAt(180.0), wheel = true)) // split line
+        assertEquals(dest(1), layout.sectorOf(vectorAt(0.0), wheel = true))
+        assertEquals(157.5f, layout.wheelSkipCenter)
+        assertEquals(202.5f, layout.wheelCancelCenter)
+    }
+
+    @Test
+    fun `mirrored wheel keeps skip on top`() {
+        val layout = SectorLayout(3, mirrored = true)
+        assertEquals(Sector.Skip, layout.sectorOf(vectorAt(20.0), wheel = true))
+        assertEquals(Sector.Cancel, layout.sectorOf(vectorAt(340.0), wheel = true))
     }
 }

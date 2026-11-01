@@ -67,7 +67,10 @@ sealed interface GestureOutcome {
 
     data class Swipe(val slot: Slot) : GestureOutcome
 
-    /** Drag released without reaching a destination (too short, dead zone or cancel sector): spring back. */
+    /** Swipe into the skip sector, or wheel released on "Omitir". */
+    data object Skip : GestureOutcome
+
+    /** Drag released without reaching a sector (too short or in a dead zone): spring back. */
     data object SwipeAborted : GestureOutcome
 
     data class WheelCommit(val slots: Set<Slot>) : GestureOutcome
@@ -79,7 +82,7 @@ sealed interface GestureOutcome {
 }
 
 /** Moments worth a haptic tick. */
-enum class GestureFeedback { WheelOpened, SlotSelected, SlotDeselected, EnteredCancel }
+enum class GestureFeedback { WheelOpened, SlotSelected, SlotDeselected, EnteredCancel, EnteredSkip }
 
 data class GestureStep(
     val state: GestureState,
@@ -137,7 +140,7 @@ class GestureReducer(private val config: GestureConfig) {
         val vector = position - state.origin
         val radius = vector.length
         val outside = radius >= config.wheelActivationRadius
-        val sector = if (outside) config.layout.sectorOf(vector) else null
+        val sector = if (outside) config.layout.sectorOf(vector, wheel = true) else null
 
         var selected = state.selected
         var armed = state.armed
@@ -156,9 +159,9 @@ class GestureReducer(private val config: GestureConfig) {
             }
         }
 
-        if (sector == Sector.Cancel && state.hovered != Sector.Cancel) {
+        if ((sector == Sector.Cancel || sector == Sector.Skip) && state.hovered != sector) {
             armed = false
-            feedback = GestureFeedback.EnteredCancel
+            feedback = if (sector == Sector.Cancel) GestureFeedback.EnteredCancel else GestureFeedback.EnteredSkip
         }
 
         val next = state.copy(current = position, selected = selected, armed = armed, hovered = sector)
@@ -168,17 +171,20 @@ class GestureReducer(private val config: GestureConfig) {
     private fun onUp(state: GestureState, input: PointerInput.Up): GestureStep = when (state) {
         is GestureState.Pressing -> GestureStep(GestureState.Idle, GestureOutcome.Tap(input.position, input.timeMs))
         is GestureState.Dragging -> {
-            val slot = classifySwipe(input.position - state.origin, input.velocity)
-            val outcome = slot?.let(GestureOutcome::Swipe) ?: GestureOutcome.SwipeAborted
+            val outcome = when (val sector = classifySwipe(input.position - state.origin, input.velocity)) {
+                is Sector.Destination -> GestureOutcome.Swipe(sector.slot)
+                Sector.Skip -> GestureOutcome.Skip
+                else -> GestureOutcome.SwipeAborted
+            }
             GestureStep(GestureState.Idle, outcome)
         }
 
         is GestureState.Wheel -> {
             val vector = input.position - state.origin
-            val releasedOnCancel = vector.length >= config.wheelActivationRadius &&
-                config.layout.sectorOf(vector) == Sector.Cancel
+            val releasedOn = if (vector.length >= config.wheelActivationRadius) config.layout.sectorOf(vector, wheel = true) else null
             val outcome = when {
-                releasedOnCancel -> GestureOutcome.WheelCancelled
+                releasedOn == Sector.Cancel -> GestureOutcome.WheelCancelled
+                releasedOn == Sector.Skip -> GestureOutcome.Skip
                 state.selected.isEmpty() -> GestureOutcome.WheelDismissed
                 else -> GestureOutcome.WheelCommit(state.selected)
             }
@@ -189,15 +195,15 @@ class GestureReducer(private val config: GestureConfig) {
     }
 
     /**
-     * Destination for a released drag: long enough, or short but fast (a fling). The direction comes
-     * from the displacement, or from the velocity for short flings. The cancel sector returns `null`.
+     * Sector for a released drag: long enough, or short but fast (a fling). The direction comes
+     * from the displacement, or from the velocity for short flings. `null` = spring back.
      */
-    fun classifySwipe(displacement: Point, velocity: Point): Slot? {
+    fun classifySwipe(displacement: Point, velocity: Point): Sector? {
         val direction = when {
             displacement.length >= config.swipeDistance -> displacement
             velocity.length >= config.flingVelocity -> velocity
             else -> return null
         }
-        return (config.layout.sectorOf(direction) as? Sector.Destination)?.slot
+        return config.layout.sectorOf(direction)
     }
 }

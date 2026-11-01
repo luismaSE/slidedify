@@ -15,7 +15,7 @@ class GestureReducerTest {
         flingVelocity = 1000f,
         wheelActivationRadius = 50f,
         wheelResetRadius = 30f,
-        // 3 destinations: Slot(0) up, Slot(1) right, Slot(2) down; cancel on the left.
+        // 3 destinations: Slot(0) up, Slot(1) right, Slot(2) down; skip on the left (wheel: skip above, cancel below).
         layout = SectorLayout(3),
     )
     private val reducer = GestureReducer(config)
@@ -28,7 +28,8 @@ class GestureReducerTest {
     private val up = Point(0f, -80f)
     private val down = Point(0f, 80f)
     private val right = Point(80f, 0f)
-    private val left = Point(-80f, 0f)
+    private val upperLeft = Point(-70f, -40f) // wheel: skip
+    private val lowerLeft = Point(-70f, 40f) // wheel: cancel
     private val center = Point(0f, 0f)
 
     /** Feeds inputs in order and returns every step. */
@@ -55,9 +56,9 @@ class GestureReducerTest {
     }
 
     @Test
-    fun `long drag to the left lands on cancel and springs back`() {
+    fun `long drag to the left skips`() {
         val steps = run(downAt(), moveBy(Point(-350f, 0f)), upBy(Point(-350f, 0f)))
-        assertEquals(GestureOutcome.SwipeAborted, steps.last().outcome)
+        assertEquals(GestureOutcome.Skip, steps.last().outcome)
     }
 
     @Test
@@ -87,9 +88,9 @@ class GestureReducerTest {
     @Test
     fun `with one playlist the whole right half adds to it`() {
         val single = GestureReducer(config.copy(layout = SectorLayout(1)))
-        assertEquals(Slot(0), single.classifySwipe(Point(400f, -200f), Point.Zero))
-        assertEquals(Slot(0), single.classifySwipe(Point(400f, 300f), Point.Zero))
-        assertNull(single.classifySwipe(Point(-400f, 0f), Point.Zero))
+        assertEquals(Sector.Destination(Slot(0)), single.classifySwipe(Point(400f, -200f), Point.Zero))
+        assertEquals(Sector.Destination(Slot(0)), single.classifySwipe(Point(400f, 300f), Point.Zero))
+        assertEquals(Sector.Skip, single.classifySwipe(Point(-400f, 0f), Point.Zero))
     }
 
     @Test
@@ -181,10 +182,17 @@ class GestureReducerTest {
     }
 
     @Test
-    fun `releasing on the left half cancels even with selections`() {
-        val steps = run(moveBy(up), moveBy(center), moveBy(left), upBy(left), from = wheelState())
+    fun `releasing on the lower left cancels even with selections`() {
+        val steps = run(moveBy(up), moveBy(center), moveBy(lowerLeft), upBy(lowerLeft), from = wheelState())
         assertEquals(GestureFeedback.EnteredCancel, steps[2].feedback)
         assertEquals(GestureOutcome.WheelCancelled, steps.last().outcome)
+    }
+
+    @Test
+    fun `releasing on the upper left skips the track`() {
+        val steps = run(moveBy(up), moveBy(center), moveBy(upperLeft), upBy(upperLeft), from = wheelState())
+        assertEquals(GestureFeedback.EnteredSkip, steps[2].feedback)
+        assertEquals(GestureOutcome.Skip, steps.last().outcome)
     }
 
     @Test
@@ -205,13 +213,14 @@ class GestureReducerTest {
     @Test
     fun `mirrored layout cancels on the right`() {
         val mirrored = GestureReducer(config.copy(layout = SectorLayout(3, mirrored = true)))
-        assertNull(mirrored.classifySwipe(Point(400f, 0f), Point.Zero))
-        assertEquals(RIGHT, mirrored.classifySwipe(Point(-400f, 0f), Point.Zero))
-        assertEquals(UP, mirrored.classifySwipe(Point(0f, -400f), Point.Zero))
+        assertEquals(Sector.Skip, mirrored.classifySwipe(Point(400f, 0f), Point.Zero))
+        assertEquals(Sector.Destination(RIGHT), mirrored.classifySwipe(Point(-400f, 0f), Point.Zero))
+        assertEquals(Sector.Destination(UP), mirrored.classifySwipe(Point(0f, -400f), Point.Zero))
 
         var state: GestureState = wheelState()
         var last: GestureStep? = null
-        listOf(moveBy(left), moveBy(center), moveBy(right), upBy(right)).forEach { input ->
+        val lowerRight = Point(70f, 40f) // mirrored: cancel
+        listOf(moveBy(Point(-80f, 0f)), moveBy(center), moveBy(lowerRight), upBy(lowerRight)).forEach { input ->
             last = mirrored.reduce(state, input).also { state = it.state }
         }
         assertEquals(GestureOutcome.WheelCancelled, last?.outcome)
