@@ -33,9 +33,12 @@ include(":lyrics:lrclib")
 include(":core:designsystem")
 include(":core:datastore")
 include(":core:data")
+include(":core:platform")
 include(":feature:source")
 include(":feature:swipe")
 include(":feature:settings")
 
 // Music providers. Each one implements MusicProvider and registers itself via Hilt.
 include(":provider:fake")
+include(":provider:spotify-api")
+include(":provider:spotify")

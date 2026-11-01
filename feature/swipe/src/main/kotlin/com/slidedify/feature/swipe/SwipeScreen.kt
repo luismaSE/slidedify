@@ -79,6 +79,7 @@ import com.slidedify.core.domain.gesture.GestureStep
 import com.slidedify.core.domain.gesture.Sector
 import com.slidedify.core.domain.gesture.SectorLayout
 import com.slidedify.core.domain.gesture.TapKind
+import com.slidedify.core.domain.player.PlayerError
 import com.slidedify.core.model.GestureMap
 import com.slidedify.core.model.Playlist
 import com.slidedify.core.model.Slot
@@ -104,6 +105,7 @@ data class SwipeActions(
     val onSkipTutorial: () -> Unit = {},
     val onBack: () -> Unit = {},
     val onOpenSettings: () -> Unit = {},
+    val onRetry: () -> Unit = {},
 )
 
 @Composable
@@ -150,6 +152,7 @@ fun SwipeRoute(onBack: () -> Unit, onOpenSettings: () -> Unit, viewModel: SwipeV
             onSkipTutorial = viewModel::skipTutorial,
             onBack = onBack,
             onOpenSettings = onOpenSettings,
+            onRetry = viewModel::load,
         ),
     )
 }
@@ -171,6 +174,7 @@ fun SwipeScreen(state: SwipeUiState, snackbar: SnackbarHostState, actions: Swipe
         ) {
             TopBar(state, actions)
             when {
+                state.loadError != null -> LoadError(state.loadError, actions, Modifier.fillMaxSize())
                 state.isLoading -> Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() }
                 state.isFinished -> FinishedMessage(actions.onBack, Modifier.fillMaxSize())
                 else -> {
@@ -512,6 +516,17 @@ private fun BottomBar(state: SwipeUiState, actions: SwipeActions, onAddDestinati
             Text(formatTime(player.positionMs), style = MaterialTheme.typography.labelSmall)
             Text(formatTime(duration), style = MaterialTheme.typography.labelSmall)
         }
+        player.error?.let { error ->
+            Text(
+                when (error) {
+                    PlayerError.PremiumRequired -> "La reproducción necesita una cuenta Premium."
+                    PlayerError.SpotifyNotInstalled -> "Instalá la app del servicio para reproducir."
+                    is PlayerError.Disconnected -> error.message ?: "No se pudo reproducir."
+                },
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
         Row(
             Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
@@ -575,6 +590,16 @@ private fun AddDestinationSheet(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun LoadError(message: String, actions: SwipeActions, modifier: Modifier = Modifier) {
+    Column(modifier.padding(24.dp), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(message, color = MaterialTheme.colorScheme.error)
+        Spacer(Modifier.height(16.dp))
+        Button(onClick = actions.onRetry) { Text("Reintentar") }
+        TextButton(onClick = actions.onBack) { Text("Volver") }
     }
 }
 

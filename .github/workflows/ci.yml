@@ -26,13 +26,16 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v5
 
-      - name: Unit tests (domain + app)
-        run: ./gradlew :core:domain:test testDebugUnitTest --stacktrace
+      - name: Unit tests
+        run: ./gradlew test --stacktrace
 
       - name: Android Lint
         run: ./gradlew lintDebug
 
       - name: Build debug APK
+        env:
+          # Optional repository secret; without it the APK only has the Demo provider.
+          SPOTIFY_CLIENT_ID: ${{ secrets.SPOTIFY_CLIENT_ID }}
         run: ./gradlew :app:assembleDebug
 
       - uses: actions/upload-artifact@v5

@@ -72,8 +72,9 @@ data class SwipeUiState(
     val pendingSync: Int = 0,
     val settings: SortSettings = SortSettings(),
     val tutorialStep: TutorialStep? = null,
+    val loadError: String? = null,
 ) {
-    val isFinished: Boolean get() = !isLoading && current == null
+    val isFinished: Boolean get() = !isLoading && current == null && loadError == null
     val canAddDestination: Boolean get() = targets.size < GestureMap.MAX_DESTINATIONS
 
     fun target(slot: Slot): SlotTarget? = targets.getOrNull(slot.index)
@@ -135,6 +136,7 @@ class SwipeViewModel @Inject constructor(
     private val playlists = MutableStateFlow<List<Playlist>>(emptyList())
     private val lyrics = MutableStateFlow<LyricsState>(LyricsState.Loading)
     private val tutorialStep = MutableStateFlow<TutorialStep?>(null)
+    private val loadError = MutableStateFlow<String?>(null)
     private val settings: StateFlow<SortSettings> =
         settingsRepository.settings.stateIn(viewModelScope, SharingStarted.Eagerly, SortSettings())
     private var lyricsJob: Job? = null
@@ -142,13 +144,13 @@ class SwipeViewModel @Inject constructor(
     private val _events = Channel<SwipeEvent>(Channel.BUFFERED)
     val events: Flow<SwipeEvent> = _events.receiveAsFlow()
 
-    private val extras = combine(lyrics, syncStatus.pendingCount, tutorialStep) { lyrics, pending, step ->
-        Triple(lyrics, pending, step)
-    }
+    private data class Extras(val lyrics: LyricsState, val pending: Int, val step: TutorialStep?, val error: String?)
+
+    private val extras = combine(lyrics, syncStatus.pendingCount, tutorialStep, loadError, ::Extras)
 
     val uiState: StateFlow<SwipeUiState> =
         combine(session, playlists, settings, player.state, extras) { session, playlists, settings, playerState, extras ->
-            val (lyricsState, pending, step) = extras
+            val (lyricsState, pending, step, error) = extras
             val base = SwipeUiState(
                 providerName = provider.displayName,
                 sourceName = sourceName,
@@ -157,7 +159,7 @@ class SwipeViewModel @Inject constructor(
                 pendingSync = pending,
                 settings = settings,
             )
-            if (session == null) return@combine base
+            if (session == null) return@combine base.copy(isLoading = error == null, loadError = error)
             val current = session.current
             val byId = playlists.associateBy { it.id }
             val map = settings.gestureMapFor(provider.id, playlists)
@@ -177,9 +179,22 @@ class SwipeViewModel @Inject constructor(
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), SwipeUiState())
 
     init {
+        load()
+    }
+
+    /** Also used by the "Reintentar" button. */
+    fun load() {
+        loadError.value = null
         viewModelScope.launch {
-            playlists.value = provider.playlists.writablePlaylists()
-            val tracks = provider.tracks.tracks(source)
+            val tracks = try {
+                playlists.value = provider.playlists.writablePlaylists()
+                provider.tracks.tracks(source)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                loadError.value = "No se pudieron cargar las canciones (${e.message})"
+                return@launch
+            }
             // When sorting a playlist, it cannot also be a destination for its own tracks.
             if (source is TrackSource.FromPlaylist) playlists.value = playlists.value.filterNot { it.id == source.id }
             session.value = SortSession(tracks)

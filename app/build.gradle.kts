@@ -51,6 +51,7 @@ dependencies {
     implementation(project(":core:designsystem"))
     implementation(project(":core:datastore"))
     implementation(project(":core:data"))
+    implementation(project(":core:platform"))
     implementation(project(":lyrics:lrclib"))
     implementation(project(":feature:source"))
     implementation(project(":feature:swipe"))
@@ -58,6 +59,7 @@ dependencies {
 
     // Providers bundled in this build. Adding one = one line here + its own module.
     implementation(project(":provider:fake"))
+    implementation(project(":provider:spotify")) // registers itself only if SPOTIFY_CLIENT_ID is set
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)

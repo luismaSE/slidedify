@@ -20,7 +20,7 @@ una canción por pantalla, se reproduce sola, y cada gesto la manda a la playlis
 | Sesión de ordenado con deshacer | ✅ `core:domain`, con tests |
 | Pantalla de swipe + rueda (Compose) | ✅ con datos y reproductor de prueba |
 | Arquitectura multi-proveedor (`MusicProvider` + registro) | ✅ |
-| Proveedor Spotify (login, Web API, reproducción) | ⏳ siguiente paso |
+| Proveedor Spotify (login PKCE, Web API, reproducción) | 🧪 implementado, falta probar con una cuenta real |
 | Letras (LRCLIB), cola offline (Room + WorkManager) | ⏳ |
 
 ## Módulos
@@ -44,6 +44,21 @@ provider/fake/       Proveedor de prueba (sin cuenta)
 4. Agregar `implementation(project(":provider:<nombre>"))` en `app/build.gradle.kts`.
 
 La pantalla de swipe y el dominio no cambian.
+
+## Conectar Spotify
+
+1. Crear una app en el [Spotify Developer Dashboard](https://developer.spotify.com/dashboard)
+   (el dueño necesita Premium; en modo desarrollo se permiten 5 usuarios, que hay que agregar en *User Management*).
+2. Agregar el Redirect URI **`slidedify://spotify-callback`** y marcar **Web API**.
+3. Poner el Client ID en `local.properties` (no se sube al repo):
+   ```properties
+   SPOTIFY_CLIENT_ID=tu_client_id
+   ```
+   En CI se lee del secreto `SPOTIFY_CLIENT_ID`.
+
+Sin Client ID la app funciona igual con el proveedor **Demo**. La reproducción con Spotify usa la
+Web API sobre la app de Spotify del teléfono (Premium); algunos endpoints de 2026 están marcados
+"verify" en `SpotifyEndpoints` hasta probarlos con una cuenta real.
 
 ## Cómo correrlo
 
