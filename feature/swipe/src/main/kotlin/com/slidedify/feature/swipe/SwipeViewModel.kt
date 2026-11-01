@@ -153,6 +153,9 @@ class SwipeViewModel @Inject constructor(
     private val loadState = MutableStateFlow(LoadState())
     private var loadJob: Job? = null
     private var started = false
+
+    /** Whether the user left playback on; false at start (the app opens paused). */
+    private var keepPlaying = false
     private var alreadySorted: Set<TrackId> = emptySet()
     private val settings: StateFlow<SortSettings> =
         settingsRepository.settings.stateIn(viewModelScope, SharingStarted.Eagerly, SortSettings())
@@ -250,7 +253,7 @@ class SwipeViewModel @Inject constructor(
                 // Wait for stored settings so autoplay/tutorial use the user's choice, not the defaults.
                 val loaded = settingsRepository.settings.first()
                 if (!loaded.tutorialCompleted) tutorialStep.value = TutorialStep.Swipe
-                onTrackChanged(autoplay = loaded.autoplay)
+                onTrackChanged()
             } else {
                 onTrackChanged()
             }
@@ -325,6 +328,8 @@ class SwipeViewModel @Inject constructor(
     fun onTogglePlayback() {
         val state = player.state.value
         val track = session.value?.current ?: return
+        // Remember the choice: the next track starts playing only if this one was playing.
+        keepPlaying = !state.isPlaying
         viewModelScope.launch {
             when {
                 state.isPlaying -> player.pause()
@@ -391,13 +396,17 @@ class SwipeViewModel @Inject constructor(
     }
 
     /** Autoplay (if enabled) and lyrics for whatever track is on screen. */
-    private fun onTrackChanged(autoplay: Boolean = settings.value.autoplay) {
+    /**
+     * The app starts paused. After that, the next track follows the last choice: it starts
+     * automatically if the previous one was playing, and stays paused if it was paused.
+     */
+    private fun onTrackChanged() {
         val track = session.value?.current
         viewModelScope.launch {
             when {
                 track == null -> player.pause()
-                autoplay && player.state.value.track?.id != track.id -> player.play(track)
-                !autoplay && player.state.value.isPlaying -> player.pause()
+                keepPlaying && player.state.value.track?.id != track.id -> player.play(track)
+                !keepPlaying && player.state.value.isPlaying -> player.pause()
             }
         }
         lyricsJob?.cancel()

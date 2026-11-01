@@ -50,13 +50,14 @@ sealed interface GestureState {
 
     /**
      * Joystick wheel centred on [origin]. A slot toggles when the finger crosses the activation radius
-     * outwards while [armed]; it re-arms when the finger returns near the centre.
+     * outwards, or when the finger slides into it from another sector. [consumed] is the last sector
+     * toggled, so staying (or jittering) in it does nothing; it resets when the finger returns near the centre.
      */
     data class Wheel(
         val origin: Point,
         val current: Point,
         val selected: Set<Slot>,
-        val armed: Boolean,
+        val consumed: Sector?,
         /** Sector under the finger while it is outside the activation radius. */
         val hovered: Sector?,
     ) : GestureState
@@ -117,7 +118,7 @@ class GestureReducer(private val config: GestureConfig) {
             origin = state.origin,
             current = state.origin,
             selected = emptySet(),
-            armed = true,
+            consumed = null,
             hovered = null,
         )
         return GestureStep(wheel, feedback = GestureFeedback.WheelOpened)
@@ -143,31 +144,37 @@ class GestureReducer(private val config: GestureConfig) {
         val sector = if (outside) config.layout.sectorOf(vector, wheel = true) else null
 
         var selected = state.selected
-        var armed = state.armed
+        var consumed = state.consumed
         var feedback: GestureFeedback? = null
 
-        if (radius <= config.wheelResetRadius) armed = true
+        // Back near the centre: the same sector can be toggled again.
+        if (radius <= config.wheelResetRadius) consumed = null
 
-        if (armed && sector is Sector.Destination) {
-            armed = false
-            if (sector.slot in selected) {
-                selected = selected - sector.slot
-                feedback = GestureFeedback.SlotDeselected
-            } else {
-                selected = selected + sector.slot
-                feedback = GestureFeedback.SlotSelected
+        // Entering a sector toggles it once: from the centre or directly from a neighbouring sector.
+        // Dead zones (null) don't reset it, so jitter on a border never toggles twice.
+        if (sector != null && sector != consumed) {
+            consumed = sector
+            when (sector) {
+                is Sector.Destination -> if (sector.slot in selected) {
+                    selected = selected - sector.slot
+                    feedback = GestureFeedback.SlotDeselected
+                } else {
+                    selected = selected + sector.slot
+                    feedback = GestureFeedback.SlotSelected
+                }
+
+                Sector.Cancel -> {
+                    // Touching "Cancelar" clears every selection at once, so a mistake can be redone
+                    // without releasing.
+                    selected = emptySet()
+                    feedback = GestureFeedback.EnteredCancel
+                }
+
+                Sector.Skip -> feedback = GestureFeedback.EnteredSkip
             }
         }
 
-        if ((sector == Sector.Cancel || sector == Sector.Skip) && state.hovered != sector) {
-            armed = false
-            feedback = if (sector == Sector.Cancel) GestureFeedback.EnteredCancel else GestureFeedback.EnteredSkip
-            // Touching "Cancelar" clears every selection at once, so a mistake can be redone
-            // without releasing: go back to the centre and pick again.
-            if (sector == Sector.Cancel) selected = emptySet()
-        }
-
-        val next = state.copy(current = position, selected = selected, armed = armed, hovered = sector)
+        val next = state.copy(current = position, selected = selected, consumed = consumed, hovered = sector)
         return GestureStep(next, feedback = feedback)
     }
 

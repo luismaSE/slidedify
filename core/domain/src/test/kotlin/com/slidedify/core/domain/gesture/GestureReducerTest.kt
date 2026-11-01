@@ -145,15 +145,23 @@ class GestureReducerTest {
     }
 
     @Test
-    fun `sliding along the rim without returning does not select more slots`() {
+    fun `sliding from one sector to the next toggles it without going back to the centre`() {
         val steps = run(
             moveBy(up),
-            moveBy(Point(60f, -60f)), // up-right, still outside
+            moveBy(Point(60f, -60f)), // border between up and right: dead zone, nothing happens
             moveBy(right),
             upBy(right),
             from = wheelState(),
         )
-        assertEquals(GestureOutcome.WheelCommit(setOf(UP)), steps.last().outcome)
+        assertEquals(GestureFeedback.SlotSelected, steps[2].feedback)
+        assertEquals(GestureOutcome.WheelCommit(setOf(UP, RIGHT)), steps.last().outcome)
+    }
+
+    @Test
+    fun `sliding back into a selected sector deselects it`() {
+        val steps = run(moveBy(up), moveBy(right), moveBy(up), upBy(up), from = wheelState())
+        assertEquals(GestureFeedback.SlotDeselected, steps[2].feedback)
+        assertEquals(GestureOutcome.WheelCommit(setOf(RIGHT)), steps.last().outcome)
     }
 
     @Test

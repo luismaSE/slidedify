@@ -139,20 +139,29 @@ class SwipeViewModelTest {
     }
 
     @Test
-    fun `first track plays and the default circle has a single destination`() = runTest(dispatcher) {
+    fun `starts paused and the default circle has a single destination`() = runTest(dispatcher) {
         val vm = viewModel()
         collect(vm)
         assertEquals(tracks[0], vm.uiState.value.current)
-        assertEquals(tracks[0], player.state.value.track)
+        assertNull(player.state.value.track)
         assertEquals(listOf(listOf(playlists[0])), vm.uiState.value.targets.map { it.playlists })
     }
 
     @Test
-    fun `autoplay off does not start playback`() = runTest(dispatcher) {
-        settings.state.update { it.copy(autoplay = false) }
+    fun `next track keeps playing only if the previous one was playing`() = runTest(dispatcher) {
         val vm = viewModel()
         collect(vm)
-        assertNull(player.state.value.track)
+
+        vm.onTogglePlayback() // play
+        assertEquals(tracks[0], player.state.value.track)
+        vm.onSkip()
+        assertEquals(tracks[1], player.state.value.track) // continued automatically
+        assertTrue(player.state.value.isPlaying)
+
+        vm.onTogglePlayback() // pause
+        vm.onSkip()
+        assertEquals(tracks[1], player.state.value.track) // stays paused, next not started
+        assertFalse(player.state.value.isPlaying)
     }
 
     @Test
@@ -168,7 +177,6 @@ class SwipeViewModelTest {
             library.effects,
         )
         assertEquals(tracks[1], vm.uiState.value.current)
-        assertEquals(tracks[1], player.state.value.track)
     }
 
     @Test
@@ -317,7 +325,6 @@ class SwipeViewModelTest {
 
         pages.send(listOf(tracks[1], tracks[2]))
         assertEquals(tracks[1], vm.uiState.value.current)
-        assertEquals(tracks[1], player.state.value.track)
 
         pages.close()
         assertFalse(vm.uiState.value.isLoadingMore)
@@ -359,7 +366,6 @@ class SwipeViewModelTest {
         vm.jumpTo(2)
 
         assertEquals(tracks[2], vm.uiState.value.current)
-        assertEquals(tracks[2], player.state.value.track)
     }
 
     private class MemoryProgress : com.slidedify.core.domain.repository.SortProgressRepository {

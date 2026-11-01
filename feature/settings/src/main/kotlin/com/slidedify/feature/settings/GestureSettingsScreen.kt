@@ -222,7 +222,6 @@ fun GestureSettingsScreen(
             item { SectionTitle("Uso") }
             item { SwitchRow("Modo zurdo", "Playlists a la izquierda, omitir/cancelar a la derecha", settings.leftHanded, onLeftHanded) }
             item { SwitchRow("Vibración", "Al abrir la rueda y al marcar playlists", settings.haptics, onHaptics) }
-            item { SwitchRow("Reproducción automática", "Cada canción empieza a sonar al aparecer", settings.autoplay, onAutoplay) }
             item {
                 Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
                     Text("Tiempo para abrir la rueda: ${settings.holdTimeoutMs} ms")

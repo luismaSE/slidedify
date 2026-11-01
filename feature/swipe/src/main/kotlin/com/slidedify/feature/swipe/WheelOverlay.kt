@@ -7,6 +7,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.TextMeasurer
@@ -27,6 +28,10 @@ import com.slidedify.core.domain.gesture.Sector
 import com.slidedify.core.domain.gesture.SectorLayout
 import kotlin.math.cos
 import kotlin.math.sin
+
+/** Neutral base of every wheel segment (the playlist colour is only on the outer rim). */
+private val WheelBase = Color(0xFF2E3137)
+private val WheelBaseHover = Color(0xFF41454D)
 
 /** One coloured segment of the wheel ring. */
 private data class Segment(
@@ -77,27 +82,38 @@ fun WheelOverlay(
         )
         drawRect(Color.Black.copy(alpha = 0.6f))
 
-        val ringWidth = outer - inner
         val midRadius = (outer + inner) / 2f
         val gapDegrees = Math.toDegrees((3.dp.toPx() / midRadius).toDouble()).toFloat()
 
         segments.forEach { segment ->
             val hovered = wheel.hovered == segment.sector
-            val alpha = when {
-                segment.selected -> 1f
-                hovered -> 0.8f
-                else -> 0.38f
+            // One neutral base colour for every segment; the segment's own colour goes on its outer
+            // rim. Selected segments get a tint of their colour, hovered ones a lighter base.
+            val fill = when {
+                segment.selected -> lerp(WheelBase, segment.color, 0.45f)
+                hovered -> WheelBaseHover
+                else -> WheelBase
             }
-            // Hovered/selected segments grow outwards a little.
-            val grow = if (hovered || segment.selected) 8.dp.toPx() else 0f
+            val grow = if (hovered || segment.selected) 6.dp.toPx() else 0f
+            val outerEdge = outer + grow
             drawRingSegment(
                 center = center,
-                radius = midRadius + grow / 2f,
-                width = ringWidth + grow,
+                radius = (outerEdge + inner) / 2f,
+                width = outerEdge - inner,
                 centerDegrees = segment.centerDegrees,
                 halfWidth = segment.halfWidth,
                 gapDegrees = gapDegrees,
-                color = segment.color.copy(alpha = alpha),
+                color = fill,
+            )
+            val rim = if (segment.selected || hovered) 7.dp.toPx() else 4.dp.toPx()
+            drawRingSegment(
+                center = center,
+                radius = outerEdge - rim / 2f,
+                width = rim,
+                centerDegrees = segment.centerDegrees,
+                halfWidth = segment.halfWidth,
+                gapDegrees = gapDegrees,
+                color = segment.color,
             )
         }
 
@@ -107,8 +123,9 @@ fun WheelOverlay(
 
         segments.forEach { segment ->
             val check = if (segment.selected) "✓ " else ""
+            // Labels stay white on the neutral base; bold when selected or under the finger.
             val emphasized = segment.selected || wheel.hovered == segment.sector
-            drawLabel(textMeasurer, "$check${segment.label}", center, midRadius, segment.centerDegrees, emphasized, segment.halfWidth)
+            drawLabel(textMeasurer, "$check${segment.label}", center, midRadius - 2.dp.toPx(), segment.centerDegrees, emphasized, segment.halfWidth)
         }
 
         val count = wheel.selected.size
@@ -157,7 +174,7 @@ private fun DrawScope.drawLabel(
     val layout = measurer.measure(
         text = text,
         style = TextStyle(
-            color = if (emphasized) Color.Black else Color.White,
+            color = Color.White,
             fontSize = if (halfWidth < 25f) 10.sp else 12.sp,
             fontWeight = if (emphasized) FontWeight.Bold else FontWeight.SemiBold,
             textAlign = TextAlign.Center,
