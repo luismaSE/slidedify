@@ -196,7 +196,7 @@ class SpotifyWebApi(
         val body = buildJsonObject {
             put("name", name)
             put("public", false)
-            put("description", "Creada con Slidedify")
+            put("description", "Creada con Compass")
         }
         return send("POST", SpotifyEndpoints.MY_PLAYLISTS, body.toString(), PlaylistDto.serializer())
     }

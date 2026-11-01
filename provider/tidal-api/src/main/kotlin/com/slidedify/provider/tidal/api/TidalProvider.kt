@@ -178,7 +178,7 @@ class TidalApi(
                 put("type", "playlists")
                 putJsonObject("attributes") {
                     put("name", name)
-                    put("description", "Creada con Slidedify")
+                    put("description", "Creada con Compass")
                     put("accessType", "UNLISTED")
                 }
             }

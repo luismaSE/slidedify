@@ -1,4 +1,6 @@
-# Slidedify
+# Compass
+
+> Antes llamada Slidedify (el id del paquete sigue siendo `com.slidedify.app`).
 
 App Android para ordenar canciones de Spotify en varias playlists con gestos tipo Tinder:
 una canción por pantalla, se reproduce sola, y cada gesto la manda a la playlist configurada.

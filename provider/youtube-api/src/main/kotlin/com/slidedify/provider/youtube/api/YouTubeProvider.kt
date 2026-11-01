@@ -151,7 +151,7 @@ class YouTubeApi(
         val body = buildJsonObject {
             putJsonObject("snippet") {
                 put("title", name)
-                put("description", "Creada con Slidedify")
+                put("description", "Creada con Compass")
             }
             putJsonObject("status") { put("privacyStatus", "private") }
         }

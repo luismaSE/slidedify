@@ -37,6 +37,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import com.slidedify.core.designsystem.AppIcons
+import com.slidedify.core.designsystem.CompassMark
 import com.slidedify.core.domain.provider.AuthState
 import com.slidedify.core.domain.provider.MusicProvider
 import com.slidedify.core.domain.provider.ProviderRegistry
@@ -169,7 +170,17 @@ fun SourceScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("¿Qué querés ordenar?") },
+                navigationIcon = { CompassMark(Modifier.padding(start = 16.dp, end = 4.dp)) },
+                title = {
+                    Column {
+                        Text("Compass", style = MaterialTheme.typography.titleLarge)
+                        Text(
+                            "¿Qué querés ordenar?",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                },
                 actions = {
                     IconButton(onClick = onOpenTransfer) { Icon(AppIcons.Swap, contentDescription = "Transferir playlists entre servicios") }
                     IconButton(onClick = onOpenSettings) { Icon(AppIcons.Tune, contentDescription = "Ajustes") }
