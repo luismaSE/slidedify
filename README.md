@@ -31,7 +31,7 @@ core/domain/    Gestos (GestureReducer, SectorLayout), SortSession, interfaces d
 
 ## Cómo correrlo
 
-Requisitos: JDK 21 y Android SDK (API 36).
+Requisitos: JDK 21 y Android SDK (API 37).
 
 ```bash
 ./gradlew :core:domain:test            # tests de gestos y sesión
