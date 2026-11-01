@@ -67,12 +67,15 @@ Login Spotify ─▶ Elegir fuente ─▶ Configurar gestos ─▶ Sesión de sw
 | Doble tap | ❤️ Agregar a Me gusta (la tarjeta **no** se descarta) |
 | Swipe ← izquierda | Omitir |
 | Swipe ↑ arriba | Playlist A |
-| Swipe → derecha | Playlist B |
-| Swipe ↓ abajo | Playlist C |
+| Swipe ↗ arriba-derecha | Playlist B |
+| Swipe → derecha | Playlist C |
+| Swipe ↘ abajo-derecha | Playlist D |
+| Swipe ↓ abajo | Playlist E |
+| Arrastrar sin soltar sobre los indicadores del costado derecho | Varias playlists a la vez (§3.3) |
 | Tap | Play / pausa |
 | Botón ↶ o sacudir | Deshacer última acción |
 
-Todo es configurable: el usuario puede reasignar cualquier dirección a cualquier playlist, a "omitir" o a un **combo** (§3.3).
+Todo es configurable: el usuario puede reasignar cualquier dirección a cualquier playlist, a "omitir" o a un **combo** (§3.3). Se puede usar con menos de 5 playlists (las direcciones sin asignar quedan deshabilitadas).
 
 ### 3.2 ¿Diagonales? — Evaluación
 
@@ -93,25 +96,62 @@ Sí son viables, pero **como modo avanzado opcional**, no por defecto.
 **Riesgos:** con 8 sectores de 45° la tasa de error sube mucho en uso con una mano (el pulgar hace arcos, no rectas). Las diagonales del lado izquierdo quedan pegadas a "omitir", y un error ahí hace perder la canción.
 
 **Propuesta:**
-- **Modo estándar (3 playlists):** ↑ → ↓, sectores de 90°.
-- **Modo avanzado (5 playlists):** se suman **↗ y ↘** únicamente (lado derecho, lejos de "omitir"). Sectores de 60° + **zona muerta** de ±7° en cada frontera: si el ángulo cae ahí, la tarjeta vuelve al centro en vez de adivinar.
-- **Feedback mientras arrastra** (clave para que funcionen las diagonales): a medida que se arrastra, se resalta en el borde de la pantalla el "chip" de la playlist destino con su color e ícono, + vibración háptica corta al cambiar de sector. Así el usuario corrige antes de soltar.
+- **5 playlists por defecto:** ↑ ↗ → ↘ ↓. Solo se usan diagonales del **lado derecho** (lejos de "omitir"). Sectores de 60° + **zona muerta** de ±7° en cada frontera: si el ángulo cae ahí, la tarjeta vuelve al centro en vez de adivinar.
+- Si el swipe en diagonal resulta impreciso, el **riel de indicadores** (§3.3) es la alternativa exacta: llevar el dedo hasta el indicador elegido y soltar.
+- **Feedback mientras arrastra** (clave para que funcionen las diagonales): a medida que se arrastra, se resalta en el riel del costado derecho (§3.3) el indicador de la playlist destino con su color e ícono, + vibración háptica corta al cambiar de sector. Así el usuario corrige antes de soltar.
 - Umbral de distancia ≥ 30 % del ancho **o** velocidad (fling) ≥ umbral; si no, vuelve al centro.
-- Métrica para decidir con datos: registrar (localmente) los "deshacer" inmediatos por dirección. Si las diagonales tienen >2× la tasa de deshacer de las cardinales, la UI sugiere volver al modo estándar.
+- Métrica para decidir con datos: registrar (localmente) los "deshacer" inmediatos por dirección. Si las diagonales tienen >2× la tasa de deshacer de las cardinales, la UI sugiere usar el riel de indicadores en lugar del swipe en diagonal.
 
-**Para más de 5 playlists:** **mantener presionado** abre un **menú radial** (pie menu) con hasta 8 destinos; se selecciona arrastrando hacia la porción y soltando. Más lento, pero preciso y sin límite práctico.
+**Para más de 5 playlists:** se usan combos (§3.3) o se cambia el set de playlists entre sesiones. Mantener presionado queda reservado para el riel, así que no hay menú radial.
 
-### 3.3 Asignar a varias playlists a la vez — Evaluación
+### 3.3 Asignar a varias playlists a la vez — Riel de indicadores
 
-| Opción | Cómo funciona | Pros | Contras |
-|---|---|---|---|
-| **A. Chips seleccionables + swipe para confirmar** | Abajo de la tarjeta hay chips con las playlists. Tocar chips las marca; luego cualquier swipe de "agregar" manda a **todas las marcadas + la de la dirección** | Explícito, visible, sin gestos raros | Un toque extra por playlist |
-| **B. Combos (presets)** | En la configuración, una dirección puede apuntar a un grupo: ↑ = "Gym + Running" | Un solo gesto, rapidísimo | Hay que configurarlo antes |
-| **C. Swipe con 2 dedos = "agregar y quedarse"** | Agrega a esa playlist pero la tarjeta vuelve; se puede seguir con otra dirección | Fluido para usuarios avanzados | Poco descubrible |
-| D. Menú radial multi-selección | Long-press, se tocan varias porciones, se confirma | Escala a muchas | Lento |
-| E. Arrastrar pasando por varios bordes | Recorrer varios destinos antes de soltar | Original | Muy propenso a errores — **descartado** |
+**Idea:** en el costado derecho hay un **riel vertical con 5 indicadores**, uno por playlist, ordenados igual que las direcciones (↑ arriba, ↗, →, ↘, ↓ abajo). Mientras el dedo **no se levanta**, el usuario va tocando 2 o más indicadores; **al levantar el dedo** la canción se agrega a todas las playlists marcadas. Mientras mantiene el dedo, aparece un botón **Cancelar** por si se confundió.
 
-**Recomendación:** **A + B** en el MVP, **C** como atajo opcional en v2.
+```
+┌──────────────────────────────────┐
+│                           ┌────┐ │
+│                           │ ↑  │ │  A · Gym      ✓ (marcado)
+│      ┌────────┐           │ ↗  │ │  B · Chill
+│      │ mini   │  ✓Gym     │ →  │ │  C · Focus    ✓ (marcado)
+│      │ portada│  ✓Focus   │ ↘  │ │  D · Party
+│      └────────┘     ●←dedo│ ↓  │ │  E · Running
+│                           └────┘ │
+│ ┌──────────┐                     │
+│ │✕ Cancelar│  ← aparece solo     │
+│ └──────────┘    mientras se mantiene el dedo
+└──────────────────────────────────┘
+```
+
+**Reglas del gesto:**
+
+1. **Arrastre normal:** la tarjeta sigue al dedo. Si el usuario suelta sin haber marcado ningún indicador, se comporta como swipe simple (§3.2): se calcula la dirección, o vuelve al centro.
+2. **Marcar un indicador:** el dedo tiene que **quedarse ~150 ms** sobre el indicador. Se llena un anillo de progreso, hay vibración corta y aparece un ✓. Esta pequeña espera es clave: para ir de ↑ a ↓ el dedo pasa por encima de ↗ → ↘. Sin la espera, esos se marcarían por error. Por la misma razón, un swipe rápido hacia la derecha que cruza el riel no marca nada.
+3. **Desmarcar:** quedarse otra vez ~150 ms sobre un indicador ya marcado lo desmarca.
+4. **Mientras hay marcas:** la tarjeta se achica a una mini portada que sigue al dedo, con las playlists marcadas apiladas como etiquetas ("✓ Gym · ✓ Focus").
+5. **Levantar el dedo** en cualquier lugar (salvo sobre Cancelar) → se agrega a **todas** las marcadas. Con una sola marcada, se agrega solo a esa: sirve como alternativa precisa a los swipes en diagonal.
+6. **Cancelar:** el botón **✕ Cancelar** aparece abajo a la izquierda (lejos del riel) en cuanto se marca el primer indicador, o al mantener el dedo quieto ≥ 400 ms. Si se suelta sobre él, se descarta todo y la tarjeta vuelve al centro. Es grande (≥ 88 dp) y vibra al entrar. Los swipes rápidos nunca lo ven, así que no interfiere con "omitir".
+7. **Zonas táctiles:** cada indicador mide ≥ 56 dp de alto, con 8 dp de separación. Para que cuente como "adentro", el dedo tiene que entrar al menos 8 dp (histéresis), así el temblor en el borde no marca y desmarca solo.
+
+**Estados (máquina de estados, función pura y testeable):**
+
+```
+Idle ──down──▶ Pressing ──move > slop──▶ Dragging
+                  │ hold ≥400ms               │ dwell 150ms en indicador
+                  ▼                           ▼
+              Holding(cancel visible) ◀──▶ MultiSelect(selected: Set, cancel visible)
+                                              │
+   up sin marcas → clasificar swipe (§3.2)    │ up sobre Cancelar → Idle (sin cambios)
+                                              │ up en otro lugar → Commit(selected) → Idle
+```
+
+**Detalles:**
+- **Zurdos:** un ajuste refleja la pantalla (riel a la izquierda, omitir con swipe a la derecha, Cancelar abajo a la derecha).
+- **Descubrimiento:** el riel está siempre visible pero discreto (íconos de 50 % de opacidad). Mientras se arrastra se agranda y muestra los nombres. La primera vez, un tutorial interactivo de 3 pasos.
+- **Combos (complemento):** en la configuración una dirección también puede apuntar a un grupo, p. ej. ↑ = "Gym + Running", para las combinaciones que se repiten mucho.
+- **Accesibilidad:** en el "modo botones" el riel se vuelve una lista de casillas que se tocan y un botón "Agregar".
+
+**Alternativas evaluadas y descartadas:** botones de playlist abajo de la tarjeta (un toque extra por playlist y ocupan espacio), swipe con 2 dedos (difícil de descubrir) y menú radial multi-selección (lento).
 
 ### 3.4 Tras cada acción
 - Animación de salida hacia la dirección + toast breve "Agregada a **Gym**" con botón **Deshacer** (5 s).
@@ -128,12 +168,13 @@ Sí son viables, pero **como modo avanzado opcional**, no por defecto.
 ┌──────────────────────────────────┐
 │ ←  Ordenando: "Liked Songs"  12/430│  barra superior + progreso
 │                        ↶   ⚙      │
-│        ┌──────────────┐  [A] Gym  │  ← chip destino se ilumina
-│        │              │           │     al arrastrar en esa dirección
-│        │   PORTADA    │           │
-│ [skip] │   (album)    │  [B] Chill│
-│        │              │           │
-│        └──────────────┘           │
+│      ┌──────────────┐      ┌──┐ │
+│      │              │      │↑ │ │  riel de indicadores (§3.3):
+│      │   PORTADA    │      │↗ │ │  color + ícono de cada playlist.
+│ skip │   (album)    │      │→ │ │  Se ilumina el destino al
+│      │              │      │↘ │ │  arrastrar; se agranda y muestra
+│      └──────────────┘      │↓ │ │  nombres mientras el dedo está abajo
+│                            └──┘ │
 │   Título de la canción     ❤      │
 │   Artista · Álbum · 2019          │
 │   ▶ ━━━━━━━━━○───── 1:12 / 3:40   │  progreso (seek)
@@ -142,8 +183,6 @@ Sí son viables, pero **como modo avanzado opcional**, no por defecto.
 │ │ ▶ and we are running free    │  │  la actual resaltada).
 │ │ under neon skies...          │  │  Tap = pantalla completa
 │ └──────────────────────────────┘  │
-│ [Gym✓] [Chill] [Focus] [Party]    │  chips multi-asignación (§3.3 A)
-│            [C] Focus ↓            │
 │                      ♫ Spotify    │  atribución
 └──────────────────────────────────┘
 ```
@@ -156,7 +195,7 @@ Sí son viables, pero **como modo avanzado opcional**, no por defecto.
 ### 4.2 Otras pantallas
 1. **Onboarding / Login:** explica qué hace la app, pide permisos de Spotify, verifica que la app de Spotify esté instalada y si la cuenta es Premium.
 2. **Elegir fuente:** tabs Playlists / Me gusta / Recomendadas.
-3. **Configurar gestos:** diagrama interactivo tipo brújula; tocar una dirección → elegir playlist existente, crear nueva, u "omitir", o combo. Selector de modo estándar/avanzado. Vista previa para practicar.
+3. **Configurar gestos:** diagrama interactivo tipo brújula; tocar una dirección → elegir playlist existente, crear nueva, u "omitir", o combo. Elegir combos y modo zurdo. Vista previa para practicar el riel y los swipes.
 4. **Resumen de sesión:** conteos por playlist, lista de acciones, deshacer individual.
 5. **Ajustes:** autoplay on/off, empezar canción desde el estribillo (saltar a 30 %, opcional), háptica, quitar de origen, modo botones.
 
@@ -227,7 +266,7 @@ data class SwipeUiState(
     val current: TrackCard?,
     val upcoming: List<TrackCard>,       // 2–3 precargadas
     val gestureMap: GestureMap,
-    val selectedExtraPlaylists: Set<PlaylistId>,
+    val drag: DragState,                 // Idle | Dragging | Holding | MultiSelect(selected, cancelVisible)
     val player: PlayerState,
     val lyrics: LyricsState,
     val pendingSync: Int,
@@ -235,11 +274,11 @@ data class SwipeUiState(
 sealed interface SwipeIntent {
     data class Swiped(val direction: Direction) : SwipeIntent
     data object DoubleTapped : SwipeIntent
-    data class ToggleChip(val id: PlaylistId) : SwipeIntent
+    data class MultiSelectCommitted(val playlists: Set<PlaylistId>) : SwipeIntent
     data object Undo : SwipeIntent
 }
 ```
-El ViewModel expone `StateFlow<SwipeUiState>` y recibe `SwipeIntent`; la detección de gestos (Compose `pointerInput` + `Animatable`) traduce eventos crudos a `Direction` mediante una función pura `classify(dx, dy, velocity, mode): Direction?`, fácil de testear.
+El ViewModel expone `StateFlow<SwipeUiState>` y recibe `SwipeIntent`; la detección de gestos (Compose `pointerInput` + `Animatable`) traduce eventos crudos a `Direction` mediante una función pura `classify(dx, dy, velocity, mode): Direction?`. El riel de multi-selección es un reductor puro `reduce(DragState, PointerEvent(x, y, t, type)): DragState` que no depende de Compose; la UI solo le pasa los eventos del puntero y las posiciones de los indicadores. Ambos se testean sin emulador.
 
 ---
 
@@ -277,7 +316,7 @@ El ViewModel expone `StateFlow<SwipeUiState>` y recibe `SwipeIntent`; la detecci
 - **Rendimiento:** precarga de 2–3 tarjetas, imágenes con tamaño exacto, Baseline Profiles, R8 en release.
 - **Privacidad:** el historial de acciones se guarda solo en el dispositivo; política de privacidad clara (requisito de Spotify y Play Store).
 - **Git:** trunk-based, PRs chicos, Conventional Commits, CI obligatoria para mergear.
-- **Tests prioritarios:** `classify()` de gestos (tabla de ángulos), outbox/sync (lotes, 429, deshacer), mapeo de DTOs, ViewModel del swipe.
+- **Tests prioritarios:** `classify()` de gestos (tabla de ángulos), reductor del riel (pasar por encima sin marcar, espera, desmarcar, cancelar, soltar), outbox/sync (lotes, 429, deshacer), mapeo de DTOs, ViewModel del swipe.
 
 ---
 
@@ -286,9 +325,9 @@ El ViewModel expone `StateFlow<SwipeUiState>` y recibe `SwipeIntent`; la detecci
 | Fase | Contenido |
 |---|---|
 | **0 · Setup** (1 sem) | Proyecto multi-módulo, CI, design system base, registro app en Spotify Dashboard |
-| **1 · MVP** (3–4 sem) | Login PKCE, elegir playlist/Me gusta, swipe 4 direcciones + doble tap, autoplay, outbox + sync, deshacer |
+| **1 · MVP** (3–4 sem) | Login PKCE, elegir playlist/Me gusta, swipe 5 direcciones + doble tap, autoplay, outbox + sync, deshacer |
 | **2 · Riqueza** (2 sem) | Letras sincronizadas, hoja de detalle de artista/álbum, color dinámico, resumen de sesión |
-| **3 · Avanzado** (2 sem) | Chips multi-asignación, combos, modo 5 direcciones, menú radial, recomendadas |
+| **3 · Avanzado** (2 sem) | Riel de multi-selección con Cancelar, combos, modo zurdo, recomendadas |
 | **4 · Pulido** | Accesibilidad, Baseline Profiles, screenshot tests, beta cerrada (≤ 5 usuarios) |
 
 ---
