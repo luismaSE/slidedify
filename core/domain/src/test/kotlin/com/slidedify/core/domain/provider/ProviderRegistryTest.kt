@@ -1,7 +1,7 @@
 package com.slidedify.core.domain.provider
 
+import com.slidedify.core.domain.outbox.LibraryWriter
 import com.slidedify.core.domain.player.Player
-import com.slidedify.core.domain.repository.LibraryRepository
 import com.slidedify.core.domain.repository.PlaylistRepository
 import com.slidedify.core.domain.repository.TrackRepository
 import com.slidedify.core.model.ProviderId
@@ -17,7 +17,7 @@ class ProviderRegistryTest {
         override val auth: ProviderAuth get() = error("unused")
         override val tracks: TrackRepository get() = error("unused")
         override val playlists: PlaylistRepository get() = error("unused")
-        override val library: LibraryRepository get() = error("unused")
+        override val writer: LibraryWriter get() = error("unused")
         override val player: Player get() = error("unused")
     }
 

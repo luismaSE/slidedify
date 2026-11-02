@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <application>
+        <!-- Starts the Spotify auth library and receives its result. -->
+        <activity
+            android:name=".SpotifyLoginActivity"
+            android:exported="false"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+
+        <!--
+            Spotify auth library 5.x: its redirect receiver needs our redirect URI.
+            Must match SPOTIFY_REDIRECT_URI and the Redirect URI in the Developer Dashboard.
+        -->
+        <activity
+            android:name="com.spotify.sdk.android.auth.browser.RedirectUriReceiverActivity"
+            android:exported="true"
+            tools:node="merge">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="slidedify" android:host="spotify-callback" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

@@ -69,4 +69,56 @@ class SortSessionTest {
         assertNull(done.current)
         assertTrue(done.decide(Decision.Skip).effects.isEmpty())
     }
+
+    @Test
+    fun `appending pages keeps the position and ignores duplicates`() {
+        val advanced = session.decide(Decision.Skip).session
+        val more = advanced.append(listOf(track(3), track(4), track(5)))
+        assertEquals(5, more.tracks.size)
+        assertEquals(track(2), more.current)
+        assertEquals(listOf(track(3), track(4), track(5)), more.upcoming)
+    }
+
+    @Test
+    fun `a finished session continues when a new page arrives`() {
+        val done = (1..3).fold(session) { s, _ -> s.decide(Decision.Skip).session }
+        assertTrue(done.isFinished)
+        assertEquals(track(4), done.append(listOf(track(4))).current)
+    }
+
+    @Test
+    fun `reviewed tracks are skipped when resuming and when advancing`() {
+        val resumed = SortSession(listOf(track(1), track(2), track(3)), sorted = setOf(TrackId("t1"), TrackId("t3")))
+            .startAtFirstPending()
+        assertEquals(track(2), resumed.current)
+        assertEquals(2, resumed.sortedCount)
+
+        val next = resumed.decide(Decision.Skip).session
+        assertTrue(next.isFinished) // t3 was already reviewed
+        assertEquals(3, next.sortedCount)
+    }
+
+    @Test
+    fun `jumping back to a reviewed track and deciding again keeps it reviewed after undo`() {
+        val base = SortSession(listOf(track(1), track(2)), sorted = setOf(TrackId("t1"))).startAtFirstPending()
+        val jumped = base.jumpTo(0)
+        assertEquals(track(1), jumped.current)
+
+        val decided = jumped.decide(Decision.AddTo(setOf(gym))).session
+        assertEquals(track(2), decided.current)
+
+        val undone = decided.undo().session
+        assertEquals(track(1), undone.current)
+        assertTrue(undone.isSorted(track(1))) // it had been reviewed before the jump
+    }
+
+    @Test
+    fun `undo returns to where the track was even after skipping reviewed ones`() {
+        val session = SortSession(listOf(track(1), track(2), track(3)), sorted = setOf(TrackId("t2")))
+        val decided = session.decide(Decision.Skip).session
+        assertEquals(track(3), decided.current)
+        val undone = decided.undo().session
+        assertEquals(track(1), undone.current)
+        assertFalse(undone.isSorted(track(1)))
+    }
 }

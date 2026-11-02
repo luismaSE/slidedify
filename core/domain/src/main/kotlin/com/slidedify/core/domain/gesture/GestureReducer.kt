@@ -16,9 +16,8 @@ data class GestureConfig(
     val wheelActivationRadius: Float,
     /** Wheel: coming back inside this radius re-arms the next toggle. Must be < activation radius. */
     val wheelResetRadius: Float,
-    val deadZoneDegrees: Float = 5f,
-    /** Slots that have playlists assigned; the others cannot be selected. */
-    val enabledSlots: Set<Slot> = Slot.entries.toSet(),
+    /** How the circle is split between destinations and the cancel sector. */
+    val layout: SectorLayout = SectorLayout(destinationCount = 0),
 ) {
     init {
         require(wheelResetRadius < wheelActivationRadius) { "Reset radius must be smaller than activation radius" }
@@ -51,30 +50,28 @@ sealed interface GestureState {
 
     /**
      * Joystick wheel centred on [origin]. A slot toggles when the finger crosses the activation radius
-     * outwards while [armed]; it re-arms when the finger returns near the centre.
+     * outwards, or when the finger slides into it from another sector. [consumed] is the last sector
+     * toggled, so staying (or jittering) in it does nothing; it resets when the finger returns near the centre.
      */
     data class Wheel(
         val origin: Point,
         val current: Point,
         val selected: Set<Slot>,
-        val armed: Boolean,
+        val consumed: Sector?,
         /** Sector under the finger while it is outside the activation radius. */
         val hovered: Sector?,
     ) : GestureState
 }
 
-sealed interface SwipeResult {
-    data object Skip : SwipeResult
-
-    data class ToSlot(val slot: Slot) : SwipeResult
-}
-
 sealed interface GestureOutcome {
     data class Tap(val position: Point, val timeMs: Long) : GestureOutcome
 
-    data class Swipe(val result: SwipeResult) : GestureOutcome
+    data class Swipe(val slot: Slot) : GestureOutcome
 
-    /** Drag released without reaching a valid swipe: the card should spring back. */
+    /** Swipe into the skip sector, or wheel released on "Omitir". */
+    data object Skip : GestureOutcome
+
+    /** Drag released without reaching a sector (too short or in a dead zone): spring back. */
     data object SwipeAborted : GestureOutcome
 
     data class WheelCommit(val slots: Set<Slot>) : GestureOutcome
@@ -86,7 +83,7 @@ sealed interface GestureOutcome {
 }
 
 /** Moments worth a haptic tick. */
-enum class GestureFeedback { WheelOpened, SlotSelected, SlotDeselected, EnteredCancel }
+enum class GestureFeedback { WheelOpened, SlotSelected, SlotDeselected, EnteredCancel, EnteredSkip }
 
 data class GestureStep(
     val state: GestureState,
@@ -121,7 +118,7 @@ class GestureReducer(private val config: GestureConfig) {
             origin = state.origin,
             current = state.origin,
             selected = emptySet(),
-            armed = true,
+            consumed = null,
             hovered = null,
         )
         return GestureStep(wheel, feedback = GestureFeedback.WheelOpened)
@@ -144,48 +141,60 @@ class GestureReducer(private val config: GestureConfig) {
         val vector = position - state.origin
         val radius = vector.length
         val outside = radius >= config.wheelActivationRadius
-        val sector = if (outside) SectorLayout.sectorOf(vector, config.deadZoneDegrees) else null
+        val sector = if (outside) config.layout.sectorOf(vector, wheel = true) else null
 
         var selected = state.selected
-        var armed = state.armed
+        var consumed = state.consumed
         var feedback: GestureFeedback? = null
 
-        if (radius <= config.wheelResetRadius) armed = true
+        // Back near the centre: the same sector can be toggled again.
+        if (radius <= config.wheelResetRadius) consumed = null
 
-        if (armed && sector is Sector.Destination && sector.slot in config.enabledSlots) {
-            armed = false
-            if (sector.slot in selected) {
-                selected = selected - sector.slot
-                feedback = GestureFeedback.SlotDeselected
-            } else {
-                selected = selected + sector.slot
-                feedback = GestureFeedback.SlotSelected
+        // Entering a sector toggles it once: from the centre or directly from a neighbouring sector.
+        // Dead zones (null) don't reset it, so jitter on a border never toggles twice.
+        if (sector != null && sector != consumed) {
+            consumed = sector
+            when (sector) {
+                is Sector.Destination -> if (sector.slot in selected) {
+                    selected = selected - sector.slot
+                    feedback = GestureFeedback.SlotDeselected
+                } else {
+                    selected = selected + sector.slot
+                    feedback = GestureFeedback.SlotSelected
+                }
+
+                Sector.Cancel -> {
+                    // Touching "Cancelar" clears every selection at once, so a mistake can be redone
+                    // without releasing.
+                    selected = emptySet()
+                    feedback = GestureFeedback.EnteredCancel
+                }
+
+                Sector.Skip -> feedback = GestureFeedback.EnteredSkip
             }
         }
 
-        if (sector == Sector.Left && state.hovered != Sector.Left) {
-            armed = false
-            feedback = GestureFeedback.EnteredCancel
-        }
-
-        val next = state.copy(current = position, selected = selected, armed = armed, hovered = sector)
+        val next = state.copy(current = position, selected = selected, consumed = consumed, hovered = sector)
         return GestureStep(next, feedback = feedback)
     }
 
     private fun onUp(state: GestureState, input: PointerInput.Up): GestureStep = when (state) {
         is GestureState.Pressing -> GestureStep(GestureState.Idle, GestureOutcome.Tap(input.position, input.timeMs))
         is GestureState.Dragging -> {
-            val result = classifySwipe(input.position - state.origin, input.velocity)
-            val outcome = result?.let(GestureOutcome::Swipe) ?: GestureOutcome.SwipeAborted
+            val outcome = when (val sector = classifySwipe(input.position - state.origin, input.velocity)) {
+                is Sector.Destination -> GestureOutcome.Swipe(sector.slot)
+                Sector.Skip -> GestureOutcome.Skip
+                else -> GestureOutcome.SwipeAborted
+            }
             GestureStep(GestureState.Idle, outcome)
         }
 
         is GestureState.Wheel -> {
             val vector = input.position - state.origin
-            val releasedOnCancel = vector.length >= config.wheelActivationRadius &&
-                SectorLayout.sectorOf(vector, config.deadZoneDegrees) == Sector.Left
+            val releasedOn = if (vector.length >= config.wheelActivationRadius) config.layout.sectorOf(vector, wheel = true) else null
             val outcome = when {
-                releasedOnCancel -> GestureOutcome.WheelCancelled
+                releasedOn == Sector.Cancel -> GestureOutcome.WheelCancelled
+                releasedOn == Sector.Skip -> GestureOutcome.Skip
                 state.selected.isEmpty() -> GestureOutcome.WheelDismissed
                 else -> GestureOutcome.WheelCommit(state.selected)
             }
@@ -196,19 +205,15 @@ class GestureReducer(private val config: GestureConfig) {
     }
 
     /**
-     * A swipe counts when the drag is long enough, or short but fast (a fling). The direction comes
-     * from the displacement, or from the velocity for short flings.
+     * Sector for a released drag: long enough, or short but fast (a fling). The direction comes
+     * from the displacement, or from the velocity for short flings. `null` = spring back.
      */
-    fun classifySwipe(displacement: Point, velocity: Point): SwipeResult? {
+    fun classifySwipe(displacement: Point, velocity: Point): Sector? {
         val direction = when {
             displacement.length >= config.swipeDistance -> displacement
             velocity.length >= config.flingVelocity -> velocity
             else -> return null
         }
-        return when (val sector = SectorLayout.sectorOf(direction, config.deadZoneDegrees)) {
-            Sector.Left -> SwipeResult.Skip
-            is Sector.Destination -> if (sector.slot in config.enabledSlots) SwipeResult.ToSlot(sector.slot) else null
-            null -> null
-        }
+        return config.layout.sectorOf(direction)
     }
 }

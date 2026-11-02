@@ -60,22 +60,31 @@ Login Spotify ─▶ Elegir fuente ─▶ Configurar gestos ─▶ Sesión de sw
 
 ## 3. Diseño de interacción (gestos)
 
-### 3.1 Mapa por defecto
+### 3.1 Mapa de gestos (vigente)
 
-| Gesto | Acción |
+| Gesto / control | Acción |
 |---|---|
-| Doble tap | ❤️ Agregar a Me gusta (la tarjeta **no** se descarta) |
-| Swipe ← izquierda | Omitir |
-| Swipe ↑ arriba | Playlist A |
-| Swipe ↗ arriba-derecha | Playlist B |
-| Swipe → derecha | Playlist C |
-| Swipe ↘ abajo-derecha | Playlist D |
-| Swipe ↓ abajo | Playlist E |
-| Mantener presionado en cualquier lugar → rueda joystick | Una o varias playlists con gestos cortos (§3.3) |
+| Swipe hacia un destino | Agrega a esa playlist (o a todas las del combo) |
+| Mantener presionado → rueda joystick | Elegir uno o varios destinos con gestos cortos (§3.3) |
+| Botón **✕ Omitir** (abajo a la izquierda) | Pasa a la siguiente canción sin agregarla |
+| Botón **+ Playlist** (abajo a la derecha) | Suma una playlist existente como destino, o crea una nueva |
+| Doble tap | ❤️ Me gusta (no avanza) |
 | Tap | Play / pausa |
-| Botón ↶ o sacudir | Deshacer última acción |
+| ↶ | Deshacer |
 
-Todo es configurable: el usuario puede reasignar cualquier dirección a cualquier playlist, a "omitir" o a un **combo** (§3.3). Se puede usar con menos de 5 playlists (las direcciones sin asignar quedan deshabilitadas).
+**Reparto del círculo:** se divide en partes iguales entre los N destinos **más una zona de cancelar** (centrada a la izquierda; a la derecha en modo zurdo):
+
+| Destinos | Tamaño de cada sector | Disposición |
+|---|---|---|
+| 1 (por defecto) | 1/2 (180°) | derecha = playlist, izquierda = cancelar |
+| 2 | 1/3 (120°) | arriba-derecha, abajo-derecha, cancelar |
+| 3 | 1/4 (90°) | ↑, →, ↓, cancelar |
+| … | 1/(N+1) | los destinos siguen en sentido horario desde arriba |
+| 8 (máximo) | 1/9 (40°) | para más, usar combos |
+
+Soltar en la zona de cancelar (o en la franja muerta entre dos sectores) no hace nada: la tarjeta vuelve al centro. Los destinos y combos se editan en Ajustes.
+
+> Las secciones 3.2 y 3.3 describen la evaluación original con 5 direcciones fijas; la geometría vigente es la de esta tabla, con la misma rueda joystick.
 
 ### 3.2 ¿Diagonales? — Evaluación
 

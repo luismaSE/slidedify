@@ -1,7 +1,7 @@
 package com.slidedify.core.domain.provider
 
+import com.slidedify.core.domain.outbox.LibraryWriter
 import com.slidedify.core.domain.player.Player
-import com.slidedify.core.domain.repository.LibraryRepository
 import com.slidedify.core.domain.repository.PlaylistRepository
 import com.slidedify.core.domain.repository.TrackRepository
 import com.slidedify.core.domain.repository.TrackSource
@@ -15,6 +15,10 @@ import kotlinx.coroutines.flow.StateFlow
 data class ProviderCapabilities(
     /** Has a "liked songs" collection that can be written (double tap). */
     val canLike: Boolean = true,
+    /** Can search its catalog (needed to receive tracks from another service). */
+    val canSearch: Boolean = false,
+    /** Can create new playlists from the app. */
+    val canCreatePlaylists: Boolean = true,
     /** Can play whole tracks on demand (some services only allow previews or need a paid plan). */
     val canPlayFullTracks: Boolean = true,
     /** Sources the user can pick when starting a session. */
@@ -54,6 +58,8 @@ interface MusicProvider {
     val auth: ProviderAuth
     val tracks: TrackRepository
     val playlists: PlaylistRepository
-    val library: LibraryRepository
+
+    /** Remote writes. Called only by the outbox sync, never directly by features. */
+    val writer: LibraryWriter
     val player: Player
 }

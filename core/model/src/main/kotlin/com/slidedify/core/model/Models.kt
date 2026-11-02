@@ -33,6 +33,8 @@ data class Track(
     val durationMs: Long,
     /** Link to open the track in the provider's own app or website (required by most providers' terms). */
     val externalUrl: String? = null,
+    /** International Standard Recording Code: identifies the same recording across services, when known. */
+    val isrc: String? = null,
 ) {
     val artistNames: String get() = artists.joinToString(", ") { it.name }
 }
@@ -45,31 +47,57 @@ data class Playlist(
 )
 
 /**
- * The five destinations reachable by swipe or by the joystick wheel.
- * They all live on the right half of the circle; the left half is reserved for skip/cancel.
+ * Position of a destination on the gesture circle (0 = first, the topmost one going clockwise).
+ * The circle is split evenly between all destinations plus one "cancel" sector.
  */
-enum class Slot(val centerDegrees: Float) {
-    UP(90f),
-    UP_RIGHT(45f),
-    RIGHT(0f),
-    DOWN_RIGHT(315f),
-    DOWN(270f),
-}
+@JvmInline
+value class Slot(val index: Int)
 
 /**
- * Which playlists each slot sends a track to. A slot can point to several playlists (a "combo").
- * Slots without playlists are disabled.
+ * Ordered destinations of the gesture circle. Each destination sends a track to one playlist,
+ * or to several at once (a "combo").
  */
 data class GestureMap(
-    val targets: Map<Slot, Set<PlaylistId>>,
+    val destinations: List<Set<PlaylistId>>,
 ) {
-    val enabledSlots: Set<Slot> get() = targets.filterValues { it.isNotEmpty() }.keys
+    init {
+        require(destinations.size <= MAX_DESTINATIONS) { "At most $MAX_DESTINATIONS destinations" }
+    }
 
-    fun playlistsFor(slots: Set<Slot>): Set<PlaylistId> = slots.flatMapTo(linkedSetOf()) { targets[it].orEmpty() }
+    val size: Int get() = destinations.size
+    val slots: List<Slot> get() = destinations.indices.map(::Slot)
+    val isFull: Boolean get() = size >= MAX_DESTINATIONS
+
+    fun playlistsAt(slot: Slot): Set<PlaylistId> = destinations.getOrNull(slot.index).orEmpty()
+
+    fun playlistsFor(slots: Set<Slot>): Set<PlaylistId> = slots.sortedBy { it.index }.flatMapTo(linkedSetOf(), ::playlistsAt)
+
+    fun contains(playlist: PlaylistId): Boolean = destinations.any { playlist in it }
+
+    /** Adds a destination at the end (ignored when full or empty). */
+    fun add(playlists: Set<PlaylistId>): GestureMap =
+        if (isFull || playlists.isEmpty()) this else GestureMap(destinations + listOf(playlists))
+
+    /** Replaces the playlists of [slot]; an empty set removes the destination. */
+    fun replace(slot: Slot, playlists: Set<PlaylistId>): GestureMap = when {
+        slot.index !in destinations.indices -> this
+        playlists.isEmpty() -> remove(slot)
+        else -> GestureMap(destinations.toMutableList().also { it[slot.index] = playlists })
+    }
+
+    fun remove(slot: Slot): GestureMap = GestureMap(destinations.filterIndexed { index, _ -> index != slot.index })
+
+    /** Drops playlists that no longer exist, and destinations left empty. */
+    fun retainOnly(existing: Set<PlaylistId>): GestureMap =
+        GestureMap(destinations.map { it intersect existing }.filter { it.isNotEmpty() })
 
     companion object {
-        /** Assigns playlists to slots in order: UP, UP_RIGHT, RIGHT, DOWN_RIGHT, DOWN. */
-        fun inOrder(playlists: List<Playlist>): GestureMap =
-            GestureMap(Slot.entries.zip(playlists).associate { (slot, playlist) -> slot to setOf(playlist.id) })
+        const val MAX_DESTINATIONS = 8
+
+        val Empty = GestureMap(emptyList())
+
+        fun of(playlists: List<PlaylistId>): GestureMap = GestureMap(playlists.map { setOf(it) })
+
+        fun of(playlist: PlaylistId): GestureMap = of(listOf(playlist))
     }
 }

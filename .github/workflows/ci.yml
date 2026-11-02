@@ -9,6 +9,9 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: write # to publish the debug APK as a pre-release
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -23,13 +26,16 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v5
 
-      - name: Unit tests (domain + app)
-        run: ./gradlew :core:domain:test testDebugUnitTest --stacktrace
+      - name: Unit tests
+        run: ./gradlew test --stacktrace
 
       - name: Android Lint
         run: ./gradlew lintDebug
 
       - name: Build debug APK
+        env:
+          # Optional repository secret; without it the APK only has the Demo provider.
+          SPOTIFY_CLIENT_ID: ${{ secrets.SPOTIFY_CLIENT_ID }}
         run: ./gradlew :app:assembleDebug
 
       - uses: actions/upload-artifact@v5
@@ -46,3 +52,59 @@ jobs:
           name: slidedify-debug-apk
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
+
+      # Stable download link for testing on a phone: always the latest build of this branch.
+      - name: Publish debug APK (pre-release "debug-latest")
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp app/build/outputs/apk/debug/app-debug.apk slidedify-debug.apk
+          gh release delete debug-latest --yes --cleanup-tag || true
+          gh release create debug-latest slidedify-debug.apk \
+            --prerelease \
+            --target "$GITHUB_SHA" \
+            --title "Slidedify debug (última versión)" \
+            --notes "Build de prueba automático de ${GITHUB_REF_NAME} (${GITHUB_SHA::7}). Instalar en Android permitiendo fuentes desconocidas."
+
+  # Opens the app on an emulator so start-up crashes are caught (and their stack trace logged).
+  smoke:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        api: [34, 36]
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/download-artifact@v5
+        with:
+          name: slidedify-debug-apk
+          path: app/build/outputs/apk/debug
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Launch on emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ matrix.api }}
+          arch: x86_64
+          target: google_apis
+          disable-animations: true
+          script: ./ci/smoke.sh
+
+      - uses: actions/upload-artifact@v5
+        if: always()
+        with:
+          name: smoke-logs-${{ matrix.api }}
+          path: |
+            logcat.txt
+            smoke-screen.png
+          if-no-files-found: ignore
+
