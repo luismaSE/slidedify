@@ -32,13 +32,25 @@ tap_text() {
   adb shell input tap $(( ($1 + $3) / 2 )) $(( ($2 + $4) / 2 ))
 }
 
+# Like tap_text, but scrolls down (up to 4 times) until the element shows up.
+tap_scrolling() {
+  for _ in 1 2 3 4 5; do
+    tap_text "$1" && return 0
+    SIZE=$(adb shell wm size | grep -oE '[0-9]+x[0-9]+' | tail -1)
+    W=${SIZE%x*}; H=${SIZE#*x}
+    adb shell input swipe $((W / 2)) $((H * 3 / 4)) $((W / 2)) $((H / 4)) 300
+    sleep 1
+  done
+  return 1
+}
+
 adb install -r "$APK"
 adb logcat -c
 adb shell am start -W -n "$PKG/.MainActivity"
 check "launch" 15
 
-tap_text "Probar sin cuenta" || fail "Probar sin cuenta not on screen"; check "try the demo"
-tap_text "Me gusta" || fail "Me gusta not on screen"; check "open Me gusta" 10
+tap_scrolling "Probar sin cuenta" || fail "Probar sin cuenta not on screen"; check "try the demo"
+tap_scrolling "Me gusta" || fail "Me gusta not on screen"; check "open Me gusta" 10
 
 SIZE=$(adb shell wm size | grep -oE '[0-9]+x[0-9]+' | tail -1)
 W=${SIZE%x*}; H=${SIZE#*x}
@@ -55,7 +67,7 @@ tap_text "Conexiones" || fail "Conexiones not on screen"; check "connections tab
 adb exec-out screencap -p > smoke-connections.png
 tap_text "Ajustes" || fail "Ajustes not on screen"; check "settings tab"
 adb exec-out screencap -p > smoke-settings.png
-tap_text "DESTINOS" || fail "DESTINOS not on screen"; check "destinations editor"
+tap_scrolling "DESTINOS" || fail "DESTINOS not on screen"; check "destinations editor"
 adb shell input keyevent KEYCODE_BACK
 tap_text "Transferir" || fail "Transferir not on screen"; check "transfer tab"
 tap_text "Inicio" || fail "Inicio not on screen"; check "home tab"
