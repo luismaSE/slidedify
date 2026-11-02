@@ -109,7 +109,7 @@ class GestureSettingsViewModel @Inject constructor(
     /** Follows the active service, which can change from other tabs. null playlists = loading. */
     private val library: StateFlow<Pair<MusicProvider, List<Playlist>?>> = registry.active
         .flatMapLatest { provider ->
-            flow {
+            flow<Pair<MusicProvider, List<Playlist>?>> {
                 emit(provider to null)
                 emit(provider to runCatching { provider.playlists.writablePlaylists() }.getOrDefault(emptyList()))
             }

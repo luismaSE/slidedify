@@ -27,7 +27,7 @@ jobs:
       - uses: gradle/actions/setup-gradle@v5
 
       - name: Unit tests
-        run: ./gradlew test --stacktrace
+        run: ./gradlew test --continue
 
       - name: Android Lint
         run: ./gradlew lintDebug
