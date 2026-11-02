@@ -8,6 +8,7 @@ import com.slidedify.core.model.Track
 import com.slidedify.core.model.TrackId
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
 
 /** Where the tracks to sort come from. */
 sealed interface TrackSource {
@@ -70,6 +71,9 @@ interface SortProgressRepository {
 
     /** Forget the progress of a source ("start over"). */
     suspend fun clear(provider: ProviderId, sourceKey: String)
+
+    /** How many tracks were sorted in each source of [provider], keyed by [TrackSource.key]. */
+    fun sortedCounts(provider: ProviderId): Flow<Map<String, Int>> = flowOf(emptyMap())
 }
 
 interface PlaylistRepository {

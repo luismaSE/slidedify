@@ -1,5 +1,6 @@
 package com.slidedify.provider.spotify.api
 
+import java.io.IOException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -9,8 +10,11 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.put
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrl
@@ -19,7 +23,6 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
-import java.io.IOException
 
 /**
  * Every Web API path in one place. Spotify changed several routes in 2026 (e.g. playlist
@@ -120,7 +123,15 @@ data class PlaylistDto(
     val owner: OwnerDto? = null,
     val collaborative: Boolean = false,
     val images: List<ImageDto>? = null,
-)
+    /** `{ "total": n }`; newer API versions call it `items`. Kept loose so either shape parses. */
+    val tracks: JsonElement? = null,
+    val items: JsonElement? = null,
+) {
+    val trackCount: Int?
+        get() = listOfNotNull(tracks, items).firstNotNullOfOrNull { element ->
+            ((element as? JsonObject)?.get("total") as? JsonPrimitive)?.intOrNull
+        }
+}
 
 @Serializable
 data class DeviceDto(

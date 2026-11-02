@@ -15,6 +15,7 @@ import com.slidedify.core.domain.session.Decision
 import com.slidedify.core.domain.session.HistoryEntry
 import com.slidedify.core.domain.session.SessionUpdate
 import com.slidedify.core.domain.session.SortSession
+import com.slidedify.core.domain.settings.RecentSource
 import com.slidedify.core.domain.settings.SettingsRepository
 import com.slidedify.core.domain.settings.SortSettings
 import com.slidedify.core.model.GestureMap
@@ -201,13 +202,16 @@ class SwipeViewModel @Inject constructor(
         session.value = null
         loadJob = viewModelScope.launch {
             try {
-                playlists.value = provider.playlists.writablePlaylists()
-                    // When sorting a playlist, it cannot also be a destination for its own tracks.
-                    .filterNot { source is TrackSource.FromPlaylist && it.id == source.id }
+                val all = provider.playlists.writablePlaylists()
+                val sourcePlaylist = (source as? TrackSource.FromPlaylist)?.let { s -> all.firstOrNull { it.id == s.id } }
+                // When sorting a playlist, it cannot also be a destination for its own tracks.
+                playlists.value = all.filterNot { it.id == sourcePlaylist?.id }
+                rememberAsRecent(sourcePlaylist?.imageUrl, total = sourcePlaylist?.trackCount)
                 alreadySorted = progress.sortedTracks(provider.id, source.key)
                 provider.tracks.pages(source).collect { page -> onPage(page) }
                 if (session.value == null) onPage(emptyList())
                 loadState.value = loadState.value.copy(loadingMore = false)
+                rememberAsRecent(sourcePlaylist?.imageUrl, total = session.value?.tracks?.size)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -219,6 +223,12 @@ class SwipeViewModel @Inject constructor(
                 }
             }
         }
+    }
+
+    /** Shows this source first in "continue sorting" on the home screen. */
+    private suspend fun rememberAsRecent(imageUrl: String?, total: Int?) {
+        val entry = RecentSource(provider.id, source, sourceName, imageUrl, total, openedAt = System.currentTimeMillis())
+        settingsRepository.update { it.withRecent(entry) }
     }
 
     /** "Empezar de nuevo": forget the progress of this source and reload it. */

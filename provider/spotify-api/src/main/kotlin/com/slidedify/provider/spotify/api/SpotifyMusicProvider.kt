@@ -94,7 +94,7 @@ class SpotifyPlaylistRepository(private val api: SpotifyWebApi) : PlaylistReposi
 
     override suspend fun createPlaylist(name: String): Playlist = api.createPlaylist(name).toDomain()
 
-    private fun PlaylistDto.toDomain() = Playlist(PlaylistId(id), SPOTIFY, name, images?.firstOrNull()?.url)
+    private fun PlaylistDto.toDomain() = Playlist(PlaylistId(id), SPOTIFY, name, images?.firstOrNull()?.url, trackCount)
 }
 
 class SpotifyLibraryWriter(private val api: SpotifyWebApi) : LibraryWriter {

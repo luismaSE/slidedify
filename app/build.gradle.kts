@@ -54,6 +54,7 @@ dependencies {
     implementation(project(":core:platform"))
     implementation(project(":preview:deezer"))
     implementation(project(":feature:source"))
+    implementation(project(":feature:connections"))
     implementation(project(":feature:swipe"))
     implementation(project(":feature:settings"))
     implementation(project(":feature:transfer"))

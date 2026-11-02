@@ -6,7 +6,9 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.slidedify.core.domain.repository.TrackSource
 import com.slidedify.core.domain.settings.ButtonMode
+import com.slidedify.core.domain.settings.RecentSource
 import com.slidedify.core.domain.settings.SettingsRepository
 import com.slidedify.core.domain.settings.SortSettings
 import com.slidedify.core.model.GestureMap
@@ -37,6 +39,39 @@ internal data class StoredSettings(
     val autoplay: Boolean = true,
     val buttonMode: String = ButtonMode.Auto.name,
     val tutorialCompleted: Boolean = false,
+    val recent: List<StoredRecent> = emptyList(),
+    val lastProvider: String? = null,
+)
+
+@Serializable
+internal data class StoredRecent(
+    val provider: String,
+    val kind: String,
+    val playlistId: String? = null,
+    val title: String,
+    val imageUrl: String? = null,
+    val total: Int? = null,
+    val openedAt: Long = 0,
+)
+
+internal fun StoredRecent.toDomain(): RecentSource? {
+    val source = when (kind) {
+        TrackSource.Kind.LikedSongs.name -> TrackSource.LikedSongs
+        TrackSource.Kind.Recommended.name -> TrackSource.Recommended
+        TrackSource.Kind.Playlist.name -> playlistId?.let { TrackSource.FromPlaylist(PlaylistId(it)) }
+        else -> null
+    } ?: return null
+    return RecentSource(ProviderId(provider), source, title, imageUrl, total, openedAt)
+}
+
+internal fun RecentSource.toStored() = StoredRecent(
+    provider = provider.value,
+    kind = source.kind.name,
+    playlistId = (source as? TrackSource.FromPlaylist)?.id?.value,
+    title = title,
+    imageUrl = imageUrl,
+    total = total,
+    openedAt = openedAt,
 )
 
 internal object SettingsMapper {
@@ -57,6 +92,8 @@ internal object SettingsMapper {
         autoplay = stored.autoplay,
         buttonMode = ButtonMode.entries.firstOrNull { it.name == stored.buttonMode } ?: ButtonMode.Auto,
         tutorialCompleted = stored.tutorialCompleted,
+        recent = stored.recent.mapNotNull { it.toDomain() },
+        lastProvider = stored.lastProvider?.let(::ProviderId),
     )
 
     fun toStored(settings: SortSettings) = StoredSettings(
@@ -69,6 +106,8 @@ internal object SettingsMapper {
         autoplay = settings.autoplay,
         buttonMode = settings.buttonMode.name,
         tutorialCompleted = settings.tutorialCompleted,
+        recent = settings.recent.map { it.toStored() },
+        lastProvider = settings.lastProvider?.value,
     )
 
     fun decode(raw: String?): SortSettings = try {

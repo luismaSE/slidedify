@@ -1,5 +1,6 @@
 package com.slidedify.core.domain.settings
 
+import com.slidedify.core.domain.repository.TrackSource
 import com.slidedify.core.model.GestureMap
 import com.slidedify.core.model.Playlist
 import com.slidedify.core.model.PlaylistId
@@ -52,5 +53,28 @@ class SortSettingsTest {
         assertTrue(full.isFull)
         assertEquals(full, full.add(setOf(id("extra"))))
         assertFailsWith<IllegalArgumentException> { GestureMap((1..9).map { setOf(id("p$it")) }) }
+    }
+
+    @Test
+    fun `recent keeps newest first, one entry per source, and remembers the total`() {
+        val liked = RecentSource(provider, TrackSource.LikedSongs, "Me gusta", total = 40, openedAt = 1)
+        val gym = RecentSource(provider, TrackSource.FromPlaylist(id("gym")), "Gym", openedAt = 2)
+        val settings = SortSettings()
+            .withRecent(liked)
+            .withRecent(gym)
+            .withRecent(liked.copy(total = null, openedAt = 3))
+
+        assertEquals(listOf("Me gusta", "Gym"), settings.recent.map { it.title })
+        assertEquals(40, settings.recent.first().total)
+        assertEquals(3, settings.recent.first().openedAt)
+    }
+
+    @Test
+    fun `recent is capped`() {
+        val settings = (1..20).fold(SortSettings()) { acc, n ->
+            acc.withRecent(RecentSource(provider, TrackSource.FromPlaylist(id("p$n")), "P$n", openedAt = n.toLong()))
+        }
+        assertEquals(SortSettings.MAX_RECENT, settings.recent.size)
+        assertEquals("P20", settings.recent.first().title)
     }
 }

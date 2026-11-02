@@ -105,6 +105,6 @@ jobs:
           name: smoke-logs-${{ matrix.api }}
           path: |
             logcat.txt
-            smoke-screen.png
+            smoke-*.png
           if-no-files-found: ignore
 

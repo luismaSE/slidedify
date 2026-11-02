@@ -39,6 +39,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import com.slidedify.core.designsystem.AppIcons
+import com.slidedify.core.designsystem.EmptyState
+import androidx.compose.foundation.layout.Box
 import com.slidedify.core.domain.provider.AuthState
 import com.slidedify.core.domain.provider.ProviderRegistry
 import com.slidedify.core.domain.repository.TrackSource
@@ -165,25 +167,43 @@ class TransferViewModel @Inject constructor(
 }
 
 @Composable
-fun TransferRoute(onBack: () -> Unit, viewModel: TransferViewModel = hiltViewModel()) {
+fun TransferRoute(
+    onBack: (() -> Unit)? = null,
+    onOpenConnections: () -> Unit = {},
+    viewModel: TransferViewModel = hiltViewModel(),
+) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    TransferScreen(state, viewModel, onBack)
+    TransferScreen(state, viewModel, onBack, onOpenConnections)
 }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-private fun TransferScreen(state: TransferUiState, vm: TransferViewModel, onBack: () -> Unit) {
+private fun TransferScreen(
+    state: TransferUiState,
+    vm: TransferViewModel,
+    onBack: (() -> Unit)?,
+    onOpenConnections: () -> Unit,
+) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Transferir playlists") },
-                navigationIcon = { IconButton(onClick = onBack) { Icon(AppIcons.Back, contentDescription = "Volver") } },
+                title = { Text("Transferir") },
+                navigationIcon = {
+                    if (onBack != null) IconButton(onClick = onBack) { Icon(AppIcons.Back, contentDescription = "Volver") }
+                },
             )
         },
+        containerColor = MaterialTheme.colorScheme.background,
     ) { padding ->
         if (state.services.size < 2) {
-            Column(Modifier.fillMaxSize().padding(padding).padding(24.dp), verticalArrangement = Arrangement.Center) {
-                Text("Conectá al menos dos servicios para mover, copiar o sincronizar playlists entre ellos.")
+            Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
+                EmptyState(
+                    icon = AppIcons.Swap,
+                    title = "Mové tu música entre servicios",
+                    message = "Conectá al menos dos servicios para copiar, mover o sincronizar playlists entre ellos.",
+                    actionLabel = "Ir a Conexiones",
+                    onAction = onOpenConnections,
+                )
             }
             return@Scaffold
         }

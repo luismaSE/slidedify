@@ -454,7 +454,7 @@ private fun TrackCard(
                 customActions = a11yActions
             },
         shape = RoundedCornerShape(CardCorner),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
     ) {
         Box(
             Modifier

@@ -1,54 +1,161 @@
 package com.slidedify.app
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.navigation.NavDestination
+import androidx.navigation.NavDestination.Companion.hasRoute
+import androidx.navigation.NavDestination.Companion.hierarchy
+import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.slidedify.core.designsystem.AppIcons
 import com.slidedify.core.domain.repository.TrackSource
-import com.slidedify.feature.settings.GestureSettingsRoute
-import com.slidedify.feature.source.SourceRoute
+import com.slidedify.feature.connections.ConnectionsRoute
+import com.slidedify.feature.settings.DestinationsRoute
+import com.slidedify.feature.settings.SettingsRoute
+import com.slidedify.feature.source.HomeRoute
 import com.slidedify.feature.swipe.SwipeRoute
 import com.slidedify.feature.transfer.TransferRoute
 import kotlinx.serialization.Serializable
+import kotlin.reflect.KClass
 
 @Serializable
-object SourceDestination
+object HomeDestination
 
-/** Property names must match [com.slidedify.feature.swipe.SwipeArgs]. */
 @Serializable
-data class SwipeDestination(val kind: String, val playlistId: String? = null, val title: String)
+object TransferDestination
+
+@Serializable
+object ConnectionsDestination
 
 @Serializable
 object SettingsDestination
 
 @Serializable
-object TransferDestination
+object DestinationsDestination
+
+/** Property names must match [com.slidedify.feature.swipe.SwipeArgs]. */
+@Serializable
+data class SwipeDestination(val kind: String, val playlistId: String? = null, val title: String)
+
+/** The four sections of the bottom bar. */
+private enum class Tab(val route: Any, val routeClass: KClass<*>, val label: String, val icon: ImageVector) {
+    Home(HomeDestination, HomeDestination::class, "Inicio", AppIcons.Home),
+    Transfer(TransferDestination, TransferDestination::class, "Transferir", AppIcons.Swap),
+    Connections(ConnectionsDestination, ConnectionsDestination::class, "Conexiones", AppIcons.Link),
+    Settings(SettingsDestination, SettingsDestination::class, "Ajustes", AppIcons.Settings),
+}
+
+private fun NavDestination?.isTab(tab: Tab) = this?.hierarchy?.any { it.hasRoute(tab.routeClass) } == true
 
 @Composable
 fun SlidedifyNavHost() {
     val navController = rememberNavController()
-    NavHost(navController, startDestination = SourceDestination) {
-        composable<SourceDestination> {
-            SourceRoute(
-                onSourceSelected = { option ->
-                    val playlistId = (option.source as? TrackSource.FromPlaylist)?.id?.value
-                    navController.navigate(SwipeDestination(option.source.kind.name, playlistId, option.title))
-                },
-                onOpenSettings = { navController.navigate(SettingsDestination) },
-                onOpenTransfer = { navController.navigate(TransferDestination) },
-            )
+    val entry by navController.currentBackStackEntryAsState()
+    val destination = entry?.destination
+    val showBar = Tab.entries.any { destination.isTab(it) }
+
+    Scaffold(
+        // Each screen handles the status bar itself; this only reserves room for the bar.
+        contentWindowInsets = WindowInsets(0),
+        containerColor = MaterialTheme.colorScheme.background,
+        bottomBar = {
+            AnimatedVisibility(
+                visible = showBar,
+                enter = slideInVertically { it } + fadeIn(),
+                exit = slideOutVertically { it } + fadeOut(),
+            ) {
+                NavigationBar(containerColor = MaterialTheme.colorScheme.surfaceContainerLow) {
+                    Tab.entries.forEach { tab ->
+                        NavigationBarItem(
+                            selected = destination.isTab(tab),
+                            onClick = { navController.openTab(tab) },
+                            icon = { Icon(tab.icon, contentDescription = null) },
+                            label = { Text(tab.label) },
+                            colors = NavigationBarItemDefaults.colors(
+                                indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.18f),
+                                selectedIconColor = MaterialTheme.colorScheme.primary,
+                                selectedTextColor = MaterialTheme.colorScheme.onSurface,
+                            ),
+                        )
+                    }
+                }
+            }
+        },
+    ) { padding ->
+        NavHost(
+            navController,
+            startDestination = HomeDestination,
+            modifier = Modifier.padding(padding),
+            enterTransition = { fadeIn() },
+            exitTransition = { fadeOut() },
+        ) {
+            composable<HomeDestination> {
+                HomeRoute(
+                    onOpenSource = { source, title ->
+                        val playlistId = (source as? TrackSource.FromPlaylist)?.id?.value
+                        navController.navigate(SwipeDestination(source.kind.name, playlistId, title))
+                    },
+                    onOpenConnections = { navController.openTab(Tab.Connections) },
+                )
+            }
+            composable<TransferDestination> {
+                TransferRoute(onOpenConnections = { navController.openTab(Tab.Connections) })
+            }
+            composable<ConnectionsDestination> {
+                ConnectionsRoute()
+            }
+            composable<SettingsDestination> {
+                SettingsRoute(
+                    onOpenDestinations = { navController.navigate(DestinationsDestination) },
+                    onOpenConnections = { navController.openTab(Tab.Connections) },
+                )
+            }
+            composable<DestinationsDestination>(
+                enterTransition = { slideInHorizontally { it } },
+                popExitTransition = { slideOutHorizontally { it } },
+            ) {
+                DestinationsRoute(onBack = { navController.popBackStack() })
+            }
+            composable<SwipeDestination>(
+                enterTransition = { slideInVertically { it / 6 } + fadeIn() },
+                popExitTransition = { slideOutVertically { it / 6 } + fadeOut() },
+            ) {
+                SwipeRoute(
+                    onBack = { navController.popBackStack() },
+                    onOpenSettings = { navController.navigate(DestinationsDestination) },
+                )
+            }
         }
-        composable<TransferDestination> {
-            TransferRoute(onBack = { navController.popBackStack() })
-        }
-        composable<SwipeDestination> {
-            SwipeRoute(
-                onBack = { navController.popBackStack() },
-                onOpenSettings = { navController.navigate(SettingsDestination) },
-            )
-        }
-        composable<SettingsDestination> {
-            GestureSettingsRoute(onBack = { navController.popBackStack() })
-        }
+    }
+}
+
+/** Switches section keeping each tab's own back stack and scroll position. */
+private fun NavHostController.openTab(tab: Tab) {
+    navigate(tab.route) {
+        popUpTo(graph.findStartDestination().id) { saveState = true }
+        launchSingleTop = true
+        restoreState = true
     }
 }

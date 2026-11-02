@@ -44,6 +44,8 @@ data class Playlist(
     val provider: ProviderId,
     val name: String,
     val imageUrl: String? = null,
+    /** Number of songs, when the service reports it (shown on the home screen). */
+    val trackCount: Int? = null,
 )
 
 /**

@@ -18,6 +18,7 @@ import com.slidedify.core.model.PlaylistId
 import com.slidedify.core.model.ProviderId
 import com.slidedify.core.model.TrackId
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -74,7 +75,12 @@ interface SortedTrackDao {
 
     @Query("DELETE FROM sorted_tracks WHERE provider = :provider AND source = :source")
     suspend fun clear(provider: String, source: String)
+
+    @Query("SELECT source, COUNT(*) AS count FROM sorted_tracks WHERE provider = :provider GROUP BY source")
+    fun countsBySource(provider: String): Flow<List<SourceCount>>
 }
+
+data class SourceCount(val source: String, val count: Int)
 
 @Database(entities = [OutboxEntity::class, SortedTrackEntity::class], version = 2, exportSchema = true)
 abstract class SlidedifyDatabase : RoomDatabase() {
@@ -107,6 +113,9 @@ class RoomSortProgressRepository @Inject constructor(private val dao: SortedTrac
         dao.delete(provider.value, sourceKey, track.value)
 
     override suspend fun clear(provider: ProviderId, sourceKey: String) = dao.clear(provider.value, sourceKey)
+
+    override fun sortedCounts(provider: ProviderId): Flow<Map<String, Int>> =
+        dao.countsBySource(provider.value).map { rows -> rows.associate { it.source to it.count } }
 }
 
 internal fun WriteOp.toEntity(now: Long): OutboxEntity = when (this) {

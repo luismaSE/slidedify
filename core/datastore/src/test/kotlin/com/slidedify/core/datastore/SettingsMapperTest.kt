@@ -1,6 +1,8 @@
 package com.slidedify.core.datastore
 
+import com.slidedify.core.domain.repository.TrackSource
 import com.slidedify.core.domain.settings.ButtonMode
+import com.slidedify.core.domain.settings.RecentSource
 import com.slidedify.core.domain.settings.SortSettings
 import com.slidedify.core.model.GestureMap
 import com.slidedify.core.model.PlaylistId
@@ -22,6 +24,11 @@ class SettingsMapperTest {
             autoplay = false,
             buttonMode = ButtonMode.On,
             tutorialCompleted = true,
+            recent = listOf(
+                RecentSource(ProviderId("spotify"), TrackSource.FromPlaylist(PlaylistId("gym")), "Gym", "https://img", 120, 1_000),
+                RecentSource(ProviderId("demo"), TrackSource.LikedSongs, "Me gusta", openedAt = 500),
+            ),
+            lastProvider = ProviderId("spotify"),
         )
         assertEquals(settings, SettingsMapper.decode(SettingsMapper.encode(settings)))
     }

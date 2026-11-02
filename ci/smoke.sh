@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Installs the debug APK on the emulator and walks the main path: open the app, switch to the
-# Demo service, open a source, swipe a song, then close and reopen. Fails on any crash.
+# Installs the debug APK on the emulator and walks the main path: welcome screen, try the demo,
+# open a source, swipe a song, visit every tab, then close and reopen. Fails on any crash.
 set -u
 APK=app/build/outputs/apk/debug/app-debug.apk
 PKG=com.slidedify.app
@@ -26,7 +26,7 @@ check() {
 tap_text() {
   adb shell uiautomator dump /sdcard/ui.xml > /dev/null
   local bounds
-  bounds=$(adb exec-out cat /sdcard/ui.xml | tr '>' '\n' | grep -m1 "text=\"$1\"" | sed -E 's/.*bounds="\[([0-9]+),([0-9]+)\]\[([0-9]+),([0-9]+)\]".*/\1 \2 \3 \4/')
+  bounds=$(adb exec-out cat /sdcard/ui.xml | tr '>' '\n' | grep -m1 -F "text=\"$1" | sed -E 's/.*bounds="\[([0-9]+),([0-9]+)\]\[([0-9]+),([0-9]+)\]".*/\1 \2 \3 \4/')
   [ -z "$bounds" ] && { echo "::warning::'$1' not on screen"; return 1; }
   set -- $bounds
   adb shell input tap $(( ($1 + $3) / 2 )) $(( ($2 + $4) / 2 ))
@@ -37,8 +37,8 @@ adb logcat -c
 adb shell am start -W -n "$PKG/.MainActivity"
 check "launch" 15
 
-tap_text "Demo" && check "switch to Demo"
-tap_text "Me gusta" && check "open Me gusta" 10
+tap_text "Probar sin cuenta" || fail "Probar sin cuenta not on screen"; check "try the demo"
+tap_text "Me gusta" || fail "Me gusta not on screen"; check "open Me gusta" 10
 
 SIZE=$(adb shell wm size | grep -oE '[0-9]+x[0-9]+' | tail -1)
 W=${SIZE%x*}; H=${SIZE#*x}
@@ -46,6 +46,19 @@ adb shell input swipe $((W / 2)) $((H / 2)) $((W / 2)) $((H / 5)) 300
 check "swipe up"
 adb shell input tap $((W / 2)) $((H / 2))
 check "tap card"
+
+adb exec-out screencap -p > smoke-swipe.png
+adb shell input keyevent KEYCODE_BACK
+check "back to home"
+adb exec-out screencap -p > smoke-home.png
+tap_text "Conexiones" || fail "Conexiones not on screen"; check "connections tab"
+adb exec-out screencap -p > smoke-connections.png
+tap_text "Ajustes" || fail "Ajustes not on screen"; check "settings tab"
+adb exec-out screencap -p > smoke-settings.png
+tap_text "DESTINOS" || fail "DESTINOS not on screen"; check "destinations editor"
+adb shell input keyevent KEYCODE_BACK
+tap_text "Transferir" || fail "Transferir not on screen"; check "transfer tab"
+tap_text "Inicio" || fail "Inicio not on screen"; check "home tab"
 
 adb exec-out screencap -p > smoke-screen.png
 adb shell am force-stop "$PKG"
