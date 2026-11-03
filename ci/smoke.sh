@@ -32,6 +32,17 @@ tap_text() {
   adb shell input tap $(( ($1 + $3) / 2 )) $(( ($2 + $4) / 2 ))
 }
 
+# Presses back (up to 3 times, sheets animate away first) until the element with text $1 shows up.
+back_until() {
+  for _ in 1 2 3; do
+    adb shell input keyevent KEYCODE_BACK
+    sleep 2
+    adb shell uiautomator dump /sdcard/ui.xml > /dev/null
+    adb exec-out cat /sdcard/ui.xml | grep -q -F "text=\"$1" && return 0
+  done
+  return 1
+}
+
 # Like tap_text, but scrolls down (up to 4 times) until the element shows up.
 tap_scrolling() {
   for _ in 1 2 3 4 5; do
@@ -61,10 +72,10 @@ check "tap card"
 tap_text "Varias" || fail "Varias not on screen"; check "send to several"
 adb exec-out screencap -p > smoke-multi.png
 adb shell input keyevent KEYCODE_BACK
-sleep 1
+sleep 3
 
 adb exec-out screencap -p > smoke-swipe.png
-adb shell input keyevent KEYCODE_BACK
+back_until "Conexiones" || fail "did not get back to home"
 check "back to home"
 adb exec-out screencap -p > smoke-home.png
 tap_text "Conexiones" || fail "Conexiones not on screen"; check "connections tab"
