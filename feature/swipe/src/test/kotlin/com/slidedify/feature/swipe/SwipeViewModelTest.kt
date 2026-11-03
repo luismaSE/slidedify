@@ -409,6 +409,18 @@ class SwipeViewModelTest {
     }
 
     @Test
+    fun `sending to several playlists works without the wheel, destinations or not`() = runTest(dispatcher) {
+        useDestinations("gym")
+        val vm = viewModel()
+        collect(vm)
+
+        vm.onSendTo(setOf(id("gym"), id("party"), id("unknown")))
+
+        assertEquals<List<LibraryEffect>>(listOf(LibraryEffect.AddToPlaylists(tracks[0], setOf(id("gym"), id("party")))), library.effects)
+        assertEquals(tracks[1], vm.uiState.value.current)
+    }
+
+    @Test
     fun `no suggestion when they are turned off`() = runTest(dispatcher) {
         useDestinations("gym", "chill")
         val vm = viewModel()

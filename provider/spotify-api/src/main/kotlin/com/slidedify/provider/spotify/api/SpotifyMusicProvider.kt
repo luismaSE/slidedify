@@ -55,6 +55,7 @@ internal fun TrackDto.toDomain(): Track? {
         durationMs = durationMs,
         externalUrl = externalUrls["spotify"],
         isrc = externalIds["isrc"],
+        addedAt = addedAt?.let { runCatching { java.time.Instant.parse(it).toEpochMilli() }.getOrNull() },
     )
 }
 

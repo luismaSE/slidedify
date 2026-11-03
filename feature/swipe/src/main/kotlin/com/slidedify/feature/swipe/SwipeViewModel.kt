@@ -468,8 +468,16 @@ class SwipeViewModel @Inject constructor(
         viewModelScope.launch { settingsRepository.update { it.copy(tutorialCompleted = true) } }
     }
 
+    /** "Varias": sends the song to any set of playlists, destinations or not. */
+    fun onSendTo(ids: Set<PlaylistId>) {
+        sendTo(ids.filterTo(mutableSetOf()) { id -> playlists.value.any { it.id == id } })
+    }
+
     private fun addTo(slots: Set<Slot>) {
-        val ids = settings.value.gestureMapFor(provider.id, playlists.value).playlistsFor(slots)
+        sendTo(settings.value.gestureMapFor(provider.id, playlists.value).playlistsFor(slots))
+    }
+
+    private fun sendTo(ids: Set<PlaylistId>) {
         if (ids.isEmpty()) return
         val track = session.value?.current
         decide(Decision.AddTo(ids))

@@ -58,6 +58,10 @@ adb shell input swipe $((W / 2)) $((H / 2)) $((W / 2)) $((H / 5)) 300
 check "swipe up"
 adb shell input tap $((W / 2)) $((H / 2))
 check "tap card"
+tap_text "Varias" || fail "Varias not on screen"; check "send to several"
+adb exec-out screencap -p > smoke-multi.png
+adb shell input keyevent KEYCODE_BACK
+sleep 1
 
 adb exec-out screencap -p > smoke-swipe.png
 adb shell input keyevent KEYCODE_BACK

@@ -21,8 +21,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilledIconButton
@@ -90,6 +88,7 @@ import com.slidedify.core.domain.gesture.SectorLayout
 import com.slidedify.core.domain.gesture.TapKind
 import com.slidedify.core.model.GestureMap
 import com.slidedify.core.model.Playlist
+import com.slidedify.core.model.PlaylistId
 import com.slidedify.core.model.Slot
 import com.slidedify.core.model.Track
 import kotlinx.coroutines.Dispatchers
@@ -120,6 +119,7 @@ data class SwipeActions(
     val onOpenList: () -> Unit = {},
     val onJumpTo: (Int) -> Unit = {},
     val onAcceptSuggestion: () -> Unit = {},
+    val onSendTo: (Set<PlaylistId>) -> Unit = {},
 )
 
 @Composable
@@ -164,6 +164,7 @@ fun SwipeRoute(onBack: () -> Unit, onOpenSettings: () -> Unit, viewModel: SwipeV
             onRestart = viewModel::restart,
             onJumpTo = viewModel::jumpTo,
             onAcceptSuggestion = viewModel::onAcceptSuggestion,
+            onSendTo = viewModel::onSendTo,
         ),
     )
 }
@@ -182,6 +183,8 @@ fun SwipeScreen(state: SwipeUiState, actions: SwipeActions, notice: String? = nu
     )
     val screenActions = actions.copy(onOpenList = { showList = true })
     var showAddDestination by remember { mutableStateOf(false) }
+    var showMultiSend by remember { mutableStateOf(false) }
+    var listOptions by remember { mutableStateOf(TrackListOptions()) }
 
     Scaffold(containerColor = background) { padding ->
         Column(
@@ -214,7 +217,12 @@ fun SwipeScreen(state: SwipeUiState, actions: SwipeActions, notice: String? = nu
                     } else {
                         GestureArea(state, track, actions, Modifier.weight(1f).fillMaxWidth(), onCoverColor = { coverColor = it })
                     }
-                    BottomBar(state, actions, onAddDestination = { showAddDestination = true })
+                    BottomBar(
+                        state,
+                        actions,
+                        onAddDestination = { showAddDestination = true },
+                        onMultiSend = { showMultiSend = true },
+                    )
                 }
             }
         }
@@ -223,11 +231,23 @@ fun SwipeScreen(state: SwipeUiState, actions: SwipeActions, notice: String? = nu
     if (showList) {
         TrackListSheet(
             state = state,
+            options = listOptions,
+            onOptionsChange = { listOptions = it },
             onPick = { index ->
                 actions.onJumpTo(index)
                 showList = false
             },
             onDismiss = { showList = false },
+        )
+    }
+    if (showMultiSend && state.current != null) {
+        MultiSendSheet(
+            state = state,
+            onSend = {
+                actions.onSendTo(it)
+                showMultiSend = false
+            },
+            onDismiss = { showMultiSend = false },
         )
     }
     if (showAddDestination) {
@@ -565,7 +585,7 @@ private fun TutorialCard(step: TutorialStep, canLike: Boolean, onSkip: () -> Uni
 
 /** Progress plus the bottom controls: skip (left), play/pause (centre, big), add playlist (right). */
 @Composable
-private fun BottomBar(state: SwipeUiState, actions: SwipeActions, onAddDestination: () -> Unit) {
+private fun BottomBar(state: SwipeUiState, actions: SwipeActions, onAddDestination: () -> Unit, onMultiSend: () -> Unit) {
     val player = state.player
     val duration = player.durationMs
     Column(Modifier.padding(start = 20.dp, end = 20.dp, bottom = 16.dp, top = 4.dp)) {
@@ -588,7 +608,8 @@ private fun BottomBar(state: SwipeUiState, actions: SwipeActions, onAddDestinati
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceEvenly,
         ) {
-            RoundAction(AppIcons.Skip, "Omitir", actions.onSkip)
+            RoundAction(AppIcons.Skip, "Omitir", actions.onSkip, Modifier.weight(1f))
+            RoundAction(AppIcons.MultiSelect, "Varias", onMultiSend, Modifier.weight(1f))
             FilledIconButton(
                 onClick = actions.onTogglePlayback,
                 modifier = Modifier.size(68.dp),
@@ -599,16 +620,31 @@ private fun BottomBar(state: SwipeUiState, actions: SwipeActions, onAddDestinati
                     modifier = Modifier.size(34.dp),
                 )
             }
-            RoundAction(AppIcons.Add, "Playlist", onAddDestination)
+            if (state.canLike) {
+                RoundAction(if (state.isLiked) AppIcons.Heart else AppIcons.HeartOutline, "Me gusta", actions.onDoubleTap, Modifier.weight(1f))
+            }
+            RoundAction(AppIcons.Add, "Playlist", onAddDestination, Modifier.weight(1f))
         }
     }
 }
 
 @Composable
-private fun RoundAction(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, onClick: () -> Unit) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        OutlinedIconButton(onClick = onClick, modifier = Modifier.size(52.dp)) { Icon(icon, contentDescription = label) }
-        Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp))
+private fun RoundAction(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+        OutlinedIconButton(onClick = onClick, modifier = Modifier.size(48.dp)) { Icon(icon, contentDescription = label) }
+        Text(
+            label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(top = 4.dp),
+        )
     }
 }
 
@@ -667,62 +703,6 @@ private fun AddDestinationSheet(
 /** Card geometry, aligned with the contour line drawn by [EdgeGlow]. */
 private val CardInset = ContourInset + 8.dp
 private val CardCorner = ContourCorner - 8.dp
-
-/**
- * Whole queue of the source with its state: ✓ reviewed, ○ pending, ▶ current.
- * Tapping a track continues sorting from there.
- */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun TrackListSheet(state: SwipeUiState, onPick: (Int) -> Unit, onDismiss: () -> Unit) {
-    val listState = rememberLazyListState()
-    LaunchedEffect(Unit) { listState.scrollToItem((state.position - 2).coerceAtLeast(0)) }
-    ModalBottomSheet(onDismissRequest = onDismiss) {
-        Text(
-            "${state.sourceName} · ✓ ${state.sortedCount} de ${state.total}${if (state.isLoadingMore) " (cargando…)" else ""}",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
-        )
-        LazyColumn(state = listState, modifier = Modifier.fillMaxWidth()) {
-            itemsIndexed(state.queue, key = { _, track -> track.id.value }) { index, track ->
-                val isCurrent = index == state.position
-                val reviewed = track.id in state.sortedIds
-                ListItem(
-                    leadingContent = {
-                        Text(
-                            when {
-                                isCurrent -> "▶"
-                                reviewed -> "✓"
-                                else -> "○"
-                            },
-                            color = when {
-                                isCurrent -> MaterialTheme.colorScheme.primary
-                                reviewed -> MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
-                                else -> MaterialTheme.colorScheme.onSurfaceVariant
-                            },
-                            fontWeight = FontWeight.Bold,
-                        )
-                    },
-                    headlineContent = {
-                        Text(
-                            track.title,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal,
-                        )
-                    },
-                    supportingContent = { Text(track.artistNames, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                    modifier = Modifier
-                        .clickable(onClickLabel = "Seguir desde esta canción") { onPick(index) }
-                        .semantics {
-                            contentDescription = "${track.title}, ${if (reviewed) "revisada" else "pendiente"}"
-                        },
-                )
-            }
-        }
-    }
-}
 
 @Composable
 private fun LoadError(message: String, actions: SwipeActions, modifier: Modifier = Modifier) {

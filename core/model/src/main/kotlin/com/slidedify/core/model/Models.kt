@@ -35,6 +35,8 @@ data class Track(
     val externalUrl: String? = null,
     /** International Standard Recording Code: identifies the same recording across services, when known. */
     val isrc: String? = null,
+    /** When it was added to the source (liked or put in the playlist), epoch millis, if known. */
+    val addedAt: Long? = null,
 ) {
     val artistNames: String get() = artists.joinToString(", ") { it.name }
 }

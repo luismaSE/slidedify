@@ -92,6 +92,8 @@ data class TrackDto(
     @SerialName("is_local") val isLocal: Boolean = false,
     @SerialName("external_urls") val externalUrls: Map<String, String> = emptyMap(),
     @SerialName("external_ids") val externalIds: Map<String, String> = emptyMap(),
+    /** Not part of Spotify's track object: copied from the entry that wraps it (see [EntryDto]). */
+    val addedAt: String? = null,
 )
 
 /** Saved-tracks and playlist entries. Playlists renamed `track` to `item` in 2026; accept both. */
@@ -99,8 +101,9 @@ data class TrackDto(
 data class EntryDto(
     val track: TrackDto? = null,
     val item: TrackDto? = null,
+    @SerialName("added_at") val addedAt: String? = null,
 ) {
-    val content: TrackDto? get() = item ?: track
+    val content: TrackDto? get() = (item ?: track)?.let { if (addedAt != null) it.copy(addedAt = addedAt) else it }
 }
 
 @Serializable

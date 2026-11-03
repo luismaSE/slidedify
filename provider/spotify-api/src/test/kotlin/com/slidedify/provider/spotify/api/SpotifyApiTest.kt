@@ -130,6 +130,17 @@ class SpotifyApiTest {
     }
 
     @Test
+    fun `the date each song was added is kept`() = runTest {
+        signedIn()
+        respond(body = """{"items":[{"added_at":"2024-03-01T10:00:00Z","item":${trackJson("1")}},{"item":${trackJson("2")}}]}""")
+
+        val result = SpotifyTrackRepository(api).tracks(TrackSource.FromPlaylist(PlaylistId("pl")))
+
+        assertEquals(java.time.Instant.parse("2024-03-01T10:00:00Z").toEpochMilli(), result[0].addedAt)
+        assertEquals(null, result[1].addedAt)
+    }
+
+    @Test
     fun `playlist items accept the new item key and skip episodes`() = runTest {
         signedIn()
         respond(body = """{"items":[{"item":${trackJson("1")}},{"item":${trackJson("2", ",\"type\":\"episode\"").replace("\"type\":\"track\",", "")}}]}""")
