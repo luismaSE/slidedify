@@ -14,4 +14,5 @@ android {
 
 dependencies {
     api(project(":core:domain"))
+    implementation(project(":analysis:audio"))
 }

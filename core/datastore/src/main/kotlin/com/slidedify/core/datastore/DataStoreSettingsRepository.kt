@@ -39,6 +39,7 @@ internal data class StoredSettings(
     val autoplay: Boolean = true,
     val buttonMode: String = ButtonMode.Auto.name,
     val tutorialCompleted: Boolean = false,
+    val suggestions: Boolean = true,
     val recent: List<StoredRecent> = emptyList(),
     val lastProvider: String? = null,
 )
@@ -92,6 +93,7 @@ internal object SettingsMapper {
         autoplay = stored.autoplay,
         buttonMode = ButtonMode.entries.firstOrNull { it.name == stored.buttonMode } ?: ButtonMode.Auto,
         tutorialCompleted = stored.tutorialCompleted,
+        suggestions = stored.suggestions,
         recent = stored.recent.mapNotNull { it.toDomain() },
         lastProvider = stored.lastProvider?.let(::ProviderId),
     )
@@ -106,6 +108,7 @@ internal object SettingsMapper {
         autoplay = settings.autoplay,
         buttonMode = settings.buttonMode.name,
         tutorialCompleted = settings.tutorialCompleted,
+        suggestions = settings.suggestions,
         recent = settings.recent.map { it.toStored() },
         lastProvider = settings.lastProvider?.value,
     )

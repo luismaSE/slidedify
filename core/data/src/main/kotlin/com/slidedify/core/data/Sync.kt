@@ -18,6 +18,7 @@ import com.slidedify.core.domain.outbox.SyncStatus
 import com.slidedify.core.domain.provider.ProviderRegistry
 import com.slidedify.core.domain.repository.LibraryRepository
 import com.slidedify.core.domain.repository.SortProgressRepository
+import com.slidedify.core.domain.suggest.FeatureCache
 import dagger.Binds
 import dagger.Module
 import dagger.Provides
@@ -93,12 +94,15 @@ abstract class DataModule {
     @Binds
     abstract fun sortProgress(impl: RoomSortProgressRepository): SortProgressRepository
 
+    @Binds
+    abstract fun featureCache(impl: RoomFeatureCache): FeatureCache
+
     companion object {
         @Provides
         @Singleton
         fun database(@ApplicationContext context: Context): SlidedifyDatabase =
             Room.databaseBuilder(context, SlidedifyDatabase::class.java, "slidedify.db")
-                .addMigrations(SlidedifyDatabase.MIGRATION_1_2)
+                .addMigrations(SlidedifyDatabase.MIGRATION_1_2, SlidedifyDatabase.MIGRATION_2_3)
                 .build()
 
         @Provides
@@ -106,6 +110,9 @@ abstract class DataModule {
 
         @Provides
         fun sortedTrackDao(db: SlidedifyDatabase): SortedTrackDao = db.sortedTrackDao()
+
+        @Provides
+        fun trackFeaturesDao(db: SlidedifyDatabase): TrackFeaturesDao = db.trackFeaturesDao()
 
         /** Features write through the outbox: instant UI, works offline, synced in batches. */
         @Provides

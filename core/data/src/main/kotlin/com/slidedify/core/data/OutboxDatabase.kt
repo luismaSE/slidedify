@@ -82,11 +82,13 @@ interface SortedTrackDao {
 
 data class SourceCount(val source: String, val count: Int)
 
-@Database(entities = [OutboxEntity::class, SortedTrackEntity::class], version = 2, exportSchema = true)
+@Database(entities = [OutboxEntity::class, SortedTrackEntity::class, TrackFeaturesEntity::class], version = 3, exportSchema = true)
 abstract class SlidedifyDatabase : RoomDatabase() {
     abstract fun outboxDao(): OutboxDao
 
     abstract fun sortedTrackDao(): SortedTrackDao
+
+    abstract fun trackFeaturesDao(): TrackFeaturesDao
 
     companion object {
         /** v2 adds sorting progress; keeps pending writes intact. */
@@ -95,6 +97,17 @@ abstract class SlidedifyDatabase : RoomDatabase() {
                 db.execSQL(
                     "CREATE TABLE IF NOT EXISTS `sorted_tracks` (`provider` TEXT NOT NULL, `source` TEXT NOT NULL, " +
                         "`trackId` TEXT NOT NULL, PRIMARY KEY(`provider`, `source`, `trackId`))",
+                )
+            }
+        }
+
+        /** v3 caches how songs sound, for suggestions. */
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `track_features` (`featureKey` TEXT NOT NULL, `tags` TEXT NOT NULL, " +
+                        "`bpm` REAL, `audioEnergy` REAL, `brightness` REAL, `loudness` REAL, `analyzedBy` TEXT NOT NULL, " +
+                        "`updatedAt` INTEGER NOT NULL, PRIMARY KEY(`featureKey`))",
                 )
             }
         }

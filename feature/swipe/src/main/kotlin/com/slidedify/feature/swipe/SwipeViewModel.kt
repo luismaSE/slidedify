@@ -18,6 +18,10 @@ import com.slidedify.core.domain.session.SortSession
 import com.slidedify.core.domain.settings.RecentSource
 import com.slidedify.core.domain.settings.SettingsRepository
 import com.slidedify.core.domain.settings.SortSettings
+import com.slidedify.core.domain.suggest.PlaylistProfile
+import com.slidedify.core.domain.suggest.Suggester
+import com.slidedify.core.domain.suggest.SuggestionEngine
+import com.slidedify.core.domain.suggest.TrackFeatures
 import com.slidedify.core.model.GestureMap
 import com.slidedify.core.model.Playlist
 import com.slidedify.core.model.PlaylistId
@@ -32,10 +36,15 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.takeWhile
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -43,6 +52,9 @@ import javax.inject.Inject
 data class SlotTarget(val slot: Slot, val playlists: List<Playlist>) {
     val label: String get() = playlists.joinToString(" + ") { it.name }
 }
+
+/** A guessed destination for the current song, with the reasons to show. */
+data class SlotSuggestion(val slot: Slot, val trackId: TrackId, val label: String, val reasons: List<String>)
 
 /** Steps of the first-run tutorial; each one completes when the user performs the gesture. */
 enum class TutorialStep { Swipe, Wheel, DoubleTap }
@@ -72,6 +84,8 @@ data class SwipeUiState(
     /** Whole queue (for the track list) and which tracks were already reviewed. */
     val queue: List<Track> = emptyList(),
     val sortedIds: Set<TrackId> = emptySet(),
+    /** Where this song probably goes, when one destination clearly fits best. */
+    val suggestion: SlotSuggestion? = null,
 ) {
     val sortedCount: Int get() = queue.count { it.id in sortedIds }
     val isFinished: Boolean get() = !isLoading && current == null && loadError == null && !isLoadingMore
@@ -124,6 +138,7 @@ class SwipeViewModel @Inject constructor(
     private val libraryRepository: LibraryRepository,
     private val settingsRepository: SettingsRepository,
     private val progress: SortProgressRepository,
+    private val suggester: Suggester,
     syncStatus: SyncStatus,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
@@ -155,7 +170,26 @@ class SwipeViewModel @Inject constructor(
 
     private val extras = combine(syncStatus.pendingCount, tutorialStep, loadState, ::Extras)
 
-    val uiState: StateFlow<SwipeUiState> =
+    /** Style profile of each destination playlist (name-only at first, then learnt from its songs). */
+    private val profiles = MutableStateFlow<Map<PlaylistId, PlaylistProfile>>(emptyMap())
+    private val profilesRequested = mutableSetOf<PlaylistId>()
+
+    /** How the current and upcoming songs sound. */
+    private val trackFeatures = MutableStateFlow<Map<TrackId, TrackFeatures>>(emptyMap())
+
+    private val suggestion: Flow<SlotSuggestion?> =
+        combine(session, playlists, settings, profiles, trackFeatures) { session, playlists, settings, profiles, features ->
+            val track = session?.current
+            if (!settings.suggestions || track == null) return@combine null
+            val map = settings.gestureMapFor(provider.id, playlists)
+            // Wait until every destination has a profile, so an unready one isn't unfairly beaten.
+            val slots = map.slots.map { slot -> map.playlistsAt(slot).map { profiles[it] ?: return@combine null } }
+            SuggestionEngine.suggest(track, features[track.id], slots)?.let { found ->
+                SlotSuggestion(Slot(found.slotIndex), track.id, found.playlists.joinToString(" + ") { it.name }, found.reasons)
+            }
+        }
+
+    private val baseState: Flow<SwipeUiState> =
         combine(session, playlists, settings, player.state, extras) { session, playlists, settings, playerState, extras ->
             val (pending, step, load) = extras
             val base = SwipeUiState(
@@ -185,10 +219,76 @@ class SwipeViewModel @Inject constructor(
                 canCreatePlaylists = provider.capabilities.canCreatePlaylists,
                 tutorialStep = step,
             )
+        }
+
+    val uiState: StateFlow<SwipeUiState> =
+        combine(baseState, suggestion) { state, suggestion ->
+            if (suggestion != null && suggestion.trackId == state.current?.id) state.copy(suggestion = suggestion) else state
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), SwipeUiState())
 
     init {
         load()
+        viewModelScope.launch { watchProfiles() }
+        viewModelScope.launch { watchFeatures() }
+    }
+
+    /** Builds a profile for every destination playlist, once each, when suggestions are on. */
+    private suspend fun watchProfiles() {
+        combine(playlists, settings) { playlists, settings ->
+            if (!settings.suggestions) emptySet() else settings.gestureMapFor(provider.id, playlists).destinations.flatten().toSet()
+        }
+            .distinctUntilChanged()
+            .collect { ids ->
+                ids.filter { profilesRequested.add(it) }.forEach { id ->
+                    val playlist = playlists.value.firstOrNull { it.id == id } ?: return@forEach
+                    // The name alone already gives a hint ("Gym", "Relax") while the songs load.
+                    profiles.update { it + (id to PlaylistProfile(playlist)) }
+                    viewModelScope.launch { buildProfile(playlist) }
+                }
+            }
+    }
+
+    private suspend fun buildProfile(playlist: Playlist) {
+        try {
+            val songs = mutableListOf<Track>()
+            provider.tracks.pages(TrackSource.FromPlaylist(playlist.id))
+                .takeWhile { songs.size < PROFILE_TRACKS }
+                .collect { songs += it }
+            val built = suggester.profile(playlist, songs)
+            profiles.update { it + (playlist.id to built) }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            // Keep the name-only profile.
+        }
+    }
+
+    /** Analyses the current song, then the next two so they are ready when the user gets there. */
+    private suspend fun watchFeatures() {
+        combine(
+            session.map { it?.current }.distinctUntilChanged { a, b -> a?.id == b?.id },
+            settings.map { it.suggestions }.distinctUntilChanged(),
+        ) { track, enabled -> if (enabled) track else null }
+            .collectLatest { track ->
+                if (track == null) return@collectLatest
+                fetchFeatures(track)
+                val current = session.value ?: return@collectLatest
+                current.tracks.drop(current.position + 1).take(2).forEach { fetchFeatures(it) }
+            }
+    }
+
+    private suspend fun fetchFeatures(track: Track) {
+        val features = suggester.features(track)
+        trackFeatures.update { known ->
+            val updated = known + (track.id to features)
+            if (updated.size > MAX_FEATURES_KEPT) updated.entries.drop(updated.size - MAX_FEATURES_KEPT).associate { it.key to it.value } else updated
+        }
+    }
+
+    /** Accepts the suggested destination, like swiping to it. */
+    fun onAcceptSuggestion() {
+        val suggestion = uiState.value.suggestion ?: return
+        onSwipe(suggestion.slot)
     }
 
     /**
@@ -371,7 +471,13 @@ class SwipeViewModel @Inject constructor(
     private fun addTo(slots: Set<Slot>) {
         val ids = settings.value.gestureMapFor(provider.id, playlists.value).playlistsFor(slots)
         if (ids.isEmpty()) return
+        val track = session.value?.current
         decide(Decision.AddTo(ids))
+        // Each decision teaches the playlists what they are about.
+        if (track != null) {
+            val features = trackFeatures.value[track.id]
+            profiles.update { current -> current + ids.mapNotNull { id -> current[id]?.let { id to it.learn(track, features) } } }
+        }
         val names = playlists.value.filter { it.id in ids }.map { it.name }
         _events.trySend(SwipeEvent.Added(names))
     }
@@ -407,5 +513,9 @@ class SwipeViewModel @Inject constructor(
 
     private companion object {
         const val STOP_TIMEOUT_MS = 5_000L
+
+        /** Songs read from each destination playlist to learn its style. */
+        const val PROFILE_TRACKS = 400
+        const val MAX_FEATURES_KEPT = 30
     }
 }

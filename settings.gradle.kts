@@ -29,6 +29,8 @@ include(":core:model")
 include(":core:domain")
 include(":core:oauth")
 include(":preview:deezer")
+include(":suggest:lastfm")
+include(":analysis:audio")
 
 // Android libraries.
 include(":core:designsystem")

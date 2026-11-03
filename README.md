@@ -68,6 +68,32 @@ Sin Client ID la app funciona igual con el proveedor **Demo**. La reproducción 
 Web API sobre la app de Spotify del teléfono (Premium); algunos endpoints de 2026 están marcados
 "verify" en `SpotifyEndpoints` hasta probarlos con una cuenta real.
 
+## Sugerencias inteligentes
+
+Al ordenar, Compass sugiere a qué playlist va cada canción ("✦ Sugerido: Relax") y explica por qué.
+Nunca asigna sola: se acepta con «Enviar» o deslizando como siempre. Se apaga en Ajustes → Sugerencias.
+
+Cómo decide (`core/domain/.../suggest`):
+
+| Señal | De dónde sale | Peso |
+|---|---|---|
+| Artista ya presente en la playlist | Canciones de la playlist (hasta 400) | 0,40 |
+| Energía (tranquila ↔ intensa) | Audio de la vista previa + etiquetas + BPM + volumen | 0,30 |
+| Estilo (etiquetas) | Last.fm: "chill", "workout", "acoustic"… | 0,25 |
+| Nombre de la playlist | Diccionario ES/EN: "gym", "relax", "estudiar"… | 0,15 |
+| Tempo | Deezer (BPM) o el análisis de audio | 0,05 |
+
+- Cada playlist destino tiene un **perfil** aprendido de una muestra de sus canciones, y aprende de
+  cada canción que ordenás ahí.
+- Solo sugiere si una opción gana con claridad (puntaje ≥ 0,5 y 0,1 por encima de la segunda).
+- El análisis de audio (`analysis/audio`) se hace en el teléfono: decodifica la vista previa de
+  30 s y mide volumen, brillo, ataques por segundo y tempo. No se sube nada.
+- Los resultados quedan guardados (tabla `track_features`), así cada canción se analiza una vez.
+
+**Clave de Last.fm (opcional, gratis):** creala en https://www.last.fm/api/account/create y
+guardala como `LASTFM_API_KEY` (en `local.properties`, variable de entorno o secreto de GitHub
+Actions). Sin clave, las sugerencias usan artista, audio, tempo y nombre de la playlist.
+
 ## Cómo correrlo
 
 Requisitos: JDK 21 y Android SDK (API 37).

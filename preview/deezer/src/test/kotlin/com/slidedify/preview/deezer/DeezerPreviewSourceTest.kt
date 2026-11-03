@@ -75,4 +75,25 @@ class DeezerPreviewSourceTest {
         respond("oops", code = 500)
         assertNull(source.previewUrl(track))
     }
+
+    @Test
+    fun `features read tempo and loudness of the matched song`() = runTest {
+        val features = DeezerFeatureSource(OkHttpClient(), server.url("/"), Dispatchers.Unconfined)
+        respond("""{"data":[{"id":42,"title":"Take On Me","duration":225,"preview":"https://p/1.mp3","artist":{"name":"a-ha"}}]}""")
+        respond("""{"id":42,"title":"Take On Me","duration":225,"bpm":169.4,"gain":-9.0}""")
+        val result = features.features(track)!!
+        assertEquals(169.4f, result.bpm)
+        assertEquals(0.5f, result.loudness!!, 0.001f)
+        assertEquals("/track/42", server.takeRequest().let { server.takeRequest() }.url.encodedPath)
+    }
+
+    @Test
+    fun `unknown tempo is left empty`() = runTest {
+        val features = DeezerFeatureSource(OkHttpClient(), server.url("/"), Dispatchers.Unconfined)
+        respond("""{"data":[{"id":7,"title":"Take On Me","duration":225,"preview":"https://p/1.mp3","artist":{"name":"a-ha"}}]}""")
+        respond("""{"id":7,"bpm":0,"gain":0}""")
+        val result = features.features(track)!!
+        assertNull(result.bpm)
+        assertNull(result.loudness)
+    }
 }

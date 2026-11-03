@@ -85,6 +85,7 @@ import com.slidedify.core.domain.gesture.GestureFeedback
 import com.slidedify.core.domain.gesture.GestureOutcome
 import com.slidedify.core.domain.gesture.GestureState
 import com.slidedify.core.domain.gesture.GestureStep
+import com.slidedify.core.domain.gesture.Sector
 import com.slidedify.core.domain.gesture.SectorLayout
 import com.slidedify.core.domain.gesture.TapKind
 import com.slidedify.core.model.GestureMap
@@ -118,6 +119,7 @@ data class SwipeActions(
     val onRestart: () -> Unit = {},
     val onOpenList: () -> Unit = {},
     val onJumpTo: (Int) -> Unit = {},
+    val onAcceptSuggestion: () -> Unit = {},
 )
 
 @Composable
@@ -161,6 +163,7 @@ fun SwipeRoute(onBack: () -> Unit, onOpenSettings: () -> Unit, viewModel: SwipeV
             onRetry = viewModel::load,
             onRestart = viewModel::restart,
             onJumpTo = viewModel::jumpTo,
+            onAcceptSuggestion = viewModel::onAcceptSuggestion,
         ),
     )
 }
@@ -202,6 +205,7 @@ fun SwipeScreen(state: SwipeUiState, actions: SwipeActions, notice: String? = nu
                 state.isFinished -> FinishedMessage(actions, Modifier.fillMaxSize())
                 else -> {
                     val track = state.current ?: return@Column
+                    if (state.settings.suggestions) SuggestionBar(state.suggestion, actions.onAcceptSuggestion)
                     if (buttonMode) {
                         Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                             TrackCard(track, state, actions, Modifier.fillMaxSize().padding(CardInset), onCoverColor = { coverColor = it })
@@ -389,7 +393,7 @@ private fun GestureArea(
             )
 
             // In front of the card: the contour line and the zone name must never be hidden.
-            EdgeGlow(zones, hoveredZone, Modifier.fillMaxSize())
+            EdgeGlow(zones, hoveredZone, Modifier.fillMaxSize(), suggested = state.suggestion?.let { Sector.Destination(it.slot) })
 
             state.tutorialStep?.let { step ->
                 if (gesture == GestureState.Idle) {
@@ -409,7 +413,7 @@ private fun GestureArea(
             }
 
             (gesture as? GestureState.Wheel)?.let { wheel ->
-                WheelOverlay(wheel, state.targets, layout, Modifier.fillMaxSize())
+                WheelOverlay(wheel, state.targets, layout, Modifier.fillMaxSize(), suggested = state.suggestion?.slot)
             }
         }
     }

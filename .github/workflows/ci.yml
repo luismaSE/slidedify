@@ -36,6 +36,7 @@ jobs:
         env:
           # Optional repository secret; without it the APK only has the Demo provider.
           SPOTIFY_CLIENT_ID: ${{ secrets.SPOTIFY_CLIENT_ID }}
+          LASTFM_API_KEY: ${{ secrets.LASTFM_API_KEY }}
         run: ./gradlew :app:assembleDebug
 
       - uses: actions/upload-artifact@v5

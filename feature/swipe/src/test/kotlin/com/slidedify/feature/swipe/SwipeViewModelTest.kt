@@ -13,6 +13,10 @@ import com.slidedify.core.domain.provider.ProviderRegistry
 import com.slidedify.core.domain.repository.LibraryRepository
 import com.slidedify.core.domain.repository.PlaylistRepository
 import com.slidedify.core.domain.repository.TrackRepository
+import com.slidedify.core.domain.suggest.FeatureSource
+import com.slidedify.core.domain.suggest.InMemoryFeatureCache
+import com.slidedify.core.domain.suggest.Suggester
+import com.slidedify.core.domain.suggest.TrackFeatures
 import com.slidedify.core.domain.repository.TrackSource
 import com.slidedify.core.domain.session.LibraryEffect
 import com.slidedify.core.domain.settings.SettingsRepository
@@ -42,6 +46,7 @@ import org.junit.Before
 import org.junit.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -68,7 +73,10 @@ class SwipeViewModelTest {
 
     private val library = RecordingLibrary()
     private val player = RecordingPlayer()
-    private val settings = MemorySettings(SortSettings(tutorialCompleted = true))
+    private val settings = MemorySettings(SortSettings(tutorialCompleted = true, suggestions = false))
+    /** Songs each playlist "contains", for suggestion profiles. */
+    private val playlistContents = mutableMapOf<PlaylistId, List<Track>>()
+    private var featureSources: List<FeatureSource> = emptyList()
     private val requestedSources = mutableListOf<TrackSource>()
     private val progress = MemoryProgress()
     /** When set, the provider returns tracks in these pages instead of a single list. */
@@ -99,7 +107,10 @@ class SwipeViewModelTest {
                     return this@SwipeViewModelTest.tracks
                 }
 
-                override fun pages(source: TrackSource) = pagedTracks ?: kotlinx.coroutines.flow.flow { emit(tracks(source)) }
+                override fun pages(source: TrackSource) =
+                    (source as? TrackSource.FromPlaylist)?.let { playlistContents[it.id] }?.let { kotlinx.coroutines.flow.flowOf(it) }
+                        ?: pagedTracks
+                        ?: kotlinx.coroutines.flow.flow { emit(tracks(source)) }
             }
             override val playlists = object : PlaylistRepository {
                 override suspend fun writablePlaylists() = this@SwipeViewModelTest.playlists
@@ -114,6 +125,7 @@ class SwipeViewModelTest {
             libraryRepository = library,
             settingsRepository = settings,
             progress = progress,
+            suggester = Suggester(featureSources, InMemoryFeatureCache()),
             syncStatus = object : SyncStatus {
                 override val pendingCount = MutableStateFlow(0)
             },
@@ -370,6 +382,38 @@ class SwipeViewModelTest {
         override suspend fun clear(provider: ProviderId, sourceKey: String) {
             sorted.removeAll { it.first == sourceKey }
         }
+    }
+
+    @Test
+    fun `suggests the playlist that fits the song and learns from accepting it`() = runTest(dispatcher) {
+        settings.state.update { it.copy(suggestions = true) }
+        useDestinations("gym", "chill")
+        playlistContents[id("gym")] = emptyList()
+        playlistContents[id("chill")] = emptyList()
+        featureSources = listOf(
+            object : FeatureSource {
+                override val id = "calm"
+                override suspend fun features(track: Track) = TrackFeatures(tags = mapOf("chill" to 1f), audioEnergy = 0.15f)
+            },
+        )
+        val vm = viewModel()
+        collect(vm)
+
+        val suggestion = assertNotNull(vm.uiState.value.suggestion)
+        assertEquals(Slot(1), suggestion.slot)
+        assertEquals("chill", suggestion.label)
+
+        vm.onAcceptSuggestion()
+        assertEquals<List<LibraryEffect>>(listOf(LibraryEffect.AddToPlaylists(tracks[0], setOf(id("chill")))), library.effects)
+        assertEquals(tracks[1], vm.uiState.value.current)
+    }
+
+    @Test
+    fun `no suggestion when they are turned off`() = runTest(dispatcher) {
+        useDestinations("gym", "chill")
+        val vm = viewModel()
+        collect(vm)
+        assertNull(vm.uiState.value.suggestion)
     }
 
     private class MemorySettings(initial: SortSettings) : SettingsRepository {

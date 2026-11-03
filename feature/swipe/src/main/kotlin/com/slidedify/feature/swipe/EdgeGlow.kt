@@ -51,7 +51,7 @@ internal fun swipeZones(targets: List<SlotTarget>, layout: SectorLayout): List<Z
  * its name appears inside that zone. Drawn in front of the card so it's never hidden.
  */
 @Composable
-internal fun EdgeGlow(zones: List<Zone>, hovered: Sector?, modifier: Modifier = Modifier) {
+internal fun EdgeGlow(zones: List<Zone>, hovered: Sector?, modifier: Modifier = Modifier, suggested: Sector? = null) {
     val textMeasurer = rememberTextMeasurer()
     Canvas(modifier) {
         val center = Offset(size.width / 2f, size.height / 2f)
@@ -69,6 +69,10 @@ internal fun EdgeGlow(zones: List<Zone>, hovered: Sector?, modifier: Modifier = 
                     // Soft halo around the lit segment.
                     drawContour(contour, zone.color.copy(alpha = 0.25f), 14.dp.toPx())
                     drawContour(contour, zone.color, 6.dp.toPx())
+                } else if (hovered == null && zone.sector == suggested) {
+                    // The suggested zone glows a little while idle.
+                    drawContour(contour, zone.color.copy(alpha = 0.18f), 12.dp.toPx())
+                    drawContour(contour, zone.color, 5.dp.toPx())
                 } else {
                     drawContour(contour, zone.color.copy(alpha = alpha), 3.dp.toPx())
                 }

@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -5,6 +7,18 @@ plugins {
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt)
 }
+
+/**
+ * Free Last.fm API key (https://www.last.fm/api/account/create), for style tags in suggestions.
+ * Read from the `LASTFM_API_KEY` Gradle property, `local.properties` or environment variable.
+ * Without it, suggestions still work from artists, tempo, audio and playlist names.
+ */
+val lastFmApiKey: String = providers.gradleProperty("LASTFM_API_KEY").orNull
+    ?: rootProject.file("local.properties").takeIf { it.exists() }?.let { file ->
+        Properties().apply { file.inputStream().use(::load) }.getProperty("LASTFM_API_KEY")
+    }
+    ?: providers.environmentVariable("LASTFM_API_KEY").orNull
+    ?: ""
 
 android {
     namespace = "com.slidedify.app"
@@ -16,6 +30,7 @@ android {
         targetSdk = libs.versions.targetSdk.get().toInt()
         versionCode = 1
         versionName = "0.1.0"
+        buildConfigField("String", "LASTFM_API_KEY", "\"$lastFmApiKey\"")
     }
 
     signingConfigs {
@@ -43,6 +58,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 
@@ -53,6 +69,8 @@ dependencies {
     implementation(project(":core:data"))
     implementation(project(":core:platform"))
     implementation(project(":preview:deezer"))
+    implementation(project(":suggest:lastfm"))
+    implementation(project(":core:media"))
     implementation(project(":feature:source"))
     implementation(project(":feature:connections"))
     implementation(project(":feature:swipe"))

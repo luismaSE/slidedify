@@ -26,6 +26,7 @@ import com.slidedify.core.designsystem.color
 import com.slidedify.core.domain.gesture.GestureState
 import com.slidedify.core.domain.gesture.Sector
 import com.slidedify.core.domain.gesture.SectorLayout
+import com.slidedify.core.model.Slot
 import kotlin.math.cos
 import kotlin.math.sin
 
@@ -55,6 +56,7 @@ fun WheelOverlay(
     targets: List<SlotTarget>,
     layout: SectorLayout,
     modifier: Modifier = Modifier,
+    suggested: Slot? = null,
 ) {
     val textMeasurer = rememberTextMeasurer()
     val half = layout.sectorWidth / 2f
@@ -64,7 +66,7 @@ fun WheelOverlay(
             centerDegrees = layout.centerOf(target.slot),
             halfWidth = half,
             color = target.slot.color(),
-            label = target.label,
+            label = if (target.slot == suggested) "✦ ${target.label}" else target.label,
             selected = target.slot in wheel.selected,
         )
     } + listOf(

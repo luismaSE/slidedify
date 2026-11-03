@@ -154,6 +154,8 @@ class GestureSettingsViewModel @Inject constructor(
 
     fun setHaptics(value: Boolean) = update { it.copy(haptics = value) }
 
+    fun setSuggestions(value: Boolean) = update { it.copy(suggestions = value) }
+
     fun setHoldTimeout(ms: Long) = update { it.withHoldTimeout(ms) }
 
     fun setButtonMode(mode: ButtonMode) = update { it.copy(buttonMode = mode) }
@@ -182,6 +184,7 @@ fun SettingsRoute(
         onOpenConnections = onOpenConnections,
         onLeftHanded = viewModel::setLeftHanded,
         onHaptics = viewModel::setHaptics,
+        onSuggestions = viewModel::setSuggestions,
         onHoldTimeout = viewModel::setHoldTimeout,
         onButtonMode = viewModel::setButtonMode,
         onReplayTutorial = viewModel::replayTutorial,
@@ -197,6 +200,7 @@ fun SettingsScreen(
     onOpenConnections: () -> Unit,
     onLeftHanded: (Boolean) -> Unit,
     onHaptics: (Boolean) -> Unit,
+    onSuggestions: (Boolean) -> Unit,
     onHoldTimeout: (Long) -> Unit,
     onButtonMode: (ButtonMode) -> Unit,
     onReplayTutorial: () -> Unit,
@@ -222,6 +226,18 @@ fun SettingsScreen(
             verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
             item { DestinationsCard(state, onOpenDestinations) }
+
+            item {
+                SettingsGroup("Sugerencias") {
+                    SwitchRow(
+                        AppIcons.Sparkle,
+                        "Sugerir playlist",
+                        "Según el estilo de cada canción y de tus playlists",
+                        settings.suggestions,
+                        onSuggestions,
+                    )
+                }
+            }
 
             item {
                 SettingsGroup("Gestos") {

@@ -24,6 +24,7 @@ class SettingsMapperTest {
             autoplay = false,
             buttonMode = ButtonMode.On,
             tutorialCompleted = true,
+            suggestions = false,
             recent = listOf(
                 RecentSource(ProviderId("spotify"), TrackSource.FromPlaylist(PlaylistId("gym")), "Gym", "https://img", 120, 1_000),
                 RecentSource(ProviderId("demo"), TrackSource.LikedSongs, "Me gusta", openedAt = 500),
