@@ -34,11 +34,11 @@ tap_text() {
 
 # Presses back (up to 3 times, sheets animate away first) until the element with text $1 shows up.
 back_until() {
-  for _ in 1 2 3; do
-    adb shell input keyevent KEYCODE_BACK
-    sleep 2
+  for _ in 1 2 3 4; do
     adb shell uiautomator dump /sdcard/ui.xml > /dev/null
     adb exec-out cat /sdcard/ui.xml | grep -q -F "text=\"$1" && return 0
+    adb shell input keyevent KEYCODE_BACK
+    sleep 2
   done
   return 1
 }
@@ -71,6 +71,9 @@ adb shell input tap $((W / 2)) $((H / 2))
 check "tap card"
 tap_text "Varias" || fail "Varias not on screen"; check "send to several"
 adb exec-out screencap -p > smoke-multi.png
+# The sheet must be open: its title is on screen.
+adb shell uiautomator dump /sdcard/ui.xml > /dev/null
+adb exec-out cat /sdcard/ui.xml | grep -q -F 'text="Enviar a varias' || fail "the Varias sheet did not open"
 adb shell input keyevent KEYCODE_BACK
 sleep 3
 
