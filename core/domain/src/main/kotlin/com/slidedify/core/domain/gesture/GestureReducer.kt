@@ -44,7 +44,21 @@ sealed interface GestureState {
 
     data class Pressing(val origin: Point, val downTimeMs: Long) : GestureState
 
-    data class Dragging(val origin: Point, val current: Point) : GestureState {
+    /**
+     * Finger moving across the card. It works like the wheel without opening it: once the finger
+     * is [GestureConfig.swipeDistance] away from where it started, the zone under it toggles, and
+     * sliding on to other zones toggles those too (several playlists in one drag). The grey area
+     * splits into "Omitir" and, after something was selected, "Cancelar" (clears the selection).
+     */
+    data class Dragging(
+        val origin: Point,
+        val current: Point,
+        val selected: Set<Slot> = emptySet(),
+        val consumed: Sector? = null,
+        val hovered: Sector? = null,
+        /** Something was selected at some point in this drag (turns half of the grey zone into "Cancelar"). */
+        val hadSelection: Boolean = false,
+    ) : GestureState {
         val offset: Point get() = current - origin
     }
 
@@ -127,14 +141,57 @@ class GestureReducer(private val config: GestureConfig) {
     private fun onMove(state: GestureState, input: PointerInput.Move): GestureStep = when (state) {
         is GestureState.Pressing ->
             if ((input.position - state.origin).length > config.touchSlop) {
-                GestureStep(GestureState.Dragging(state.origin, input.position))
+                moveDrag(GestureState.Dragging(state.origin, input.position), input.position)
             } else {
                 GestureStep(state)
             }
 
-        is GestureState.Dragging -> GestureStep(state.copy(current = input.position))
+        is GestureState.Dragging -> moveDrag(state, input.position)
         is GestureState.Wheel -> moveWheel(state, input.position)
         GestureState.Idle -> GestureStep(state)
+    }
+
+    /** Same toggling rules as the wheel, measured from where the drag started. */
+    private fun moveDrag(state: GestureState.Dragging, position: Point): GestureStep {
+        val vector = position - state.origin
+        val radius = vector.length
+        val sector = if (radius >= config.swipeDistance) config.layout.sectorOf(vector, wheel = true) else null
+
+        var selected = state.selected
+        var consumed = state.consumed
+        var feedback: GestureFeedback? = null
+        if (radius <= config.swipeDistance * DRAG_RESET_FRACTION) consumed = null
+
+        if (sector != null && sector != consumed) {
+            consumed = sector
+            when (sector) {
+                is Sector.Destination -> if (sector.slot in selected) {
+                    selected = selected - sector.slot
+                    feedback = GestureFeedback.SlotDeselected
+                } else {
+                    selected = selected + sector.slot
+                    feedback = GestureFeedback.SlotSelected
+                }
+
+                Sector.Cancel -> if (state.hadSelection) {
+                    selected = emptySet()
+                    feedback = GestureFeedback.EnteredCancel
+                } else {
+                    // Nothing to cancel yet: the whole grey zone means "Omitir".
+                    feedback = GestureFeedback.EnteredSkip
+                }
+
+                Sector.Skip -> feedback = GestureFeedback.EnteredSkip
+            }
+        }
+        val next = state.copy(
+            current = position,
+            selected = selected,
+            consumed = consumed,
+            hovered = sector,
+            hadSelection = state.hadSelection || selected.isNotEmpty(),
+        )
+        return GestureStep(next, feedback = feedback)
     }
 
     private fun moveWheel(state: GestureState.Wheel, position: Point): GestureStep {
@@ -181,10 +238,22 @@ class GestureReducer(private val config: GestureConfig) {
     private fun onUp(state: GestureState, input: PointerInput.Up): GestureStep = when (state) {
         is GestureState.Pressing -> GestureStep(GestureState.Idle, GestureOutcome.Tap(input.position, input.timeMs))
         is GestureState.Dragging -> {
-            val outcome = when (val sector = classifySwipe(input.position - state.origin, input.velocity)) {
-                is Sector.Destination -> GestureOutcome.Swipe(sector.slot)
-                Sector.Skip -> GestureOutcome.Skip
-                else -> GestureOutcome.SwipeAborted
+            val vector = input.position - state.origin
+            val releasedOn = if (vector.length >= config.swipeDistance) config.layout.sectorOf(vector, wheel = true) else null
+            val outcome = when {
+                releasedOn == Sector.Cancel && state.hadSelection -> GestureOutcome.WheelCancelled
+                releasedOn == Sector.Skip || releasedOn == Sector.Cancel -> GestureOutcome.Skip
+                // Back near the start: the user changed their mind.
+                state.selected.isNotEmpty() && vector.length <= config.swipeDistance * DRAG_RESET_FRACTION -> GestureOutcome.SwipeAborted
+                state.selected.size == 1 -> GestureOutcome.Swipe(state.selected.first())
+                state.selected.size > 1 -> GestureOutcome.WheelCommit(state.selected)
+                state.hadSelection -> GestureOutcome.SwipeAborted
+                // Nothing reached: a short fast flick still counts.
+                else -> when (val sector = classifySwipe(vector, input.velocity)) {
+                    is Sector.Destination -> GestureOutcome.Swipe(sector.slot)
+                    Sector.Skip -> GestureOutcome.Skip
+                    else -> GestureOutcome.SwipeAborted
+                }
             }
             GestureStep(GestureState.Idle, outcome)
         }
@@ -215,5 +284,10 @@ class GestureReducer(private val config: GestureConfig) {
             else -> return null
         }
         return config.layout.sectorOf(direction)
+    }
+
+    private companion object {
+        /** Coming back within this fraction of the swipe distance re-arms toggling. */
+        const val DRAG_RESET_FRACTION = 0.5f
     }
 }

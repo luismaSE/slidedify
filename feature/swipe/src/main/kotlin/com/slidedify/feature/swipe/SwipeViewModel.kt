@@ -86,6 +86,9 @@ data class SwipeUiState(
     val sortedIds: Set<TrackId> = emptySet(),
     /** Where this song probably goes, when one destination clearly fits best. */
     val suggestion: SlotSuggestion? = null,
+    /** Order of [queue], chosen in the song list. */
+    val queueOrder: TrackOrder = TrackOrder.Source,
+    val queueDescending: Boolean = false,
 ) {
     val sortedCount: Int get() = queue.count { it.id in sortedIds }
     val isFinished: Boolean get() = !isLoading && current == null && loadError == null && !isLoadingMore
@@ -166,9 +169,16 @@ class SwipeViewModel @Inject constructor(
     private val _events = Channel<SwipeEvent>(Channel.BUFFERED)
     val events: Flow<SwipeEvent> = _events.receiveAsFlow()
 
-    private data class Extras(val pending: Int, val step: TutorialStep?, val load: LoadState)
+    /** Order of the queue: list order unless the user picked another one in the song list. */
+    private val queueOrder = MutableStateFlow(TrackOrder.Source to false)
 
-    private val extras = combine(syncStatus.pendingCount, tutorialStep, loadState, ::Extras)
+    /** Place of each track in the source as loaded, for "Orden de la lista". */
+    private val loadIndex = mutableMapOf<TrackId, Int>()
+    private val orderKey = "${provider.id.value}|${source.key}"
+
+    private data class Extras(val pending: Int, val step: TutorialStep?, val load: LoadState, val order: Pair<TrackOrder, Boolean>)
+
+    private val extras = combine(syncStatus.pendingCount, tutorialStep, loadState, queueOrder, ::Extras)
 
     /** Style profile of each destination playlist (name-only at first, then learnt from its songs). */
     private val profiles = MutableStateFlow<Map<PlaylistId, PlaylistProfile>>(emptyMap())
@@ -191,7 +201,7 @@ class SwipeViewModel @Inject constructor(
 
     private val baseState: Flow<SwipeUiState> =
         combine(session, playlists, settings, player.state, extras) { session, playlists, settings, playerState, extras ->
-            val (pending, step, load) = extras
+            val (pending, step, load, order) = extras
             val base = SwipeUiState(
                 providerName = provider.displayName,
                 sourceName = sourceName,
@@ -200,6 +210,8 @@ class SwipeViewModel @Inject constructor(
                 pendingSync = pending,
                 settings = settings,
                 isLoadingMore = load.loadingMore,
+                queueOrder = order.first,
+                queueDescending = order.second,
             )
             if (session == null) return@combine base.copy(isLoading = load.error == null, loadError = load.error)
             val current = session.current
@@ -285,6 +297,33 @@ class SwipeViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Reorders the songs still to sort (from the song list). The current song stays; the next
+     * ones follow the new order. Remembered for this source.
+     */
+    fun setQueueOrder(order: TrackOrder, descending: Boolean) {
+        if (queueOrder.value == (order to descending)) return
+        queueOrder.value = order to descending
+        session.value = session.value?.inQueueOrder()
+        viewModelScope.launch {
+            settingsRepository.update { it.copy(queueOrders = it.queueOrders + (orderKey to encodeOrder(order, descending))) }
+        }
+    }
+
+    private fun rememberLoadOrder(tracks: List<Track>) {
+        tracks.forEach { track -> if (track.id !in loadIndex) loadIndex[track.id] = loadIndex.size }
+    }
+
+    private fun SortSession.inQueueOrder(): SortSession {
+        val (order, descending) = queueOrder.value
+        if (order == TrackOrder.Source && !descending) {
+            // Back to list order (also after another order was used).
+            return if (tracks.zipWithNext().all { (a, b) -> (loadIndex[a.id] ?: 0) <= (loadIndex[b.id] ?: 0) }) this
+            else reordered(compareBy { loadIndex[it.id] ?: Int.MAX_VALUE })
+        }
+        return reordered(trackComparator(order, descending) { loadIndex[it.id] ?: Int.MAX_VALUE })
+    }
+
     /** Accepts the suggested destination, like swiping to it. */
     fun onAcceptSuggestion() {
         val suggestion = uiState.value.suggestion ?: return
@@ -308,6 +347,8 @@ class SwipeViewModel @Inject constructor(
                 playlists.value = all.filterNot { it.id == sourcePlaylist?.id }
                 rememberAsRecent(sourcePlaylist?.imageUrl, total = sourcePlaylist?.trackCount)
                 alreadySorted = progress.sortedTracks(provider.id, source.key)
+                loadIndex.clear()
+                decodeOrder(settingsRepository.settings.first().queueOrders[orderKey])?.let { queueOrder.value = it }
                 provider.tracks.pages(source).collect { page -> onPage(page) }
                 if (session.value == null) onPage(emptyList())
                 loadState.value = loadState.value.copy(loadingMore = false)
@@ -342,7 +383,8 @@ class SwipeViewModel @Inject constructor(
     private suspend fun onPage(tracks: List<Track>) {
         val current = session.value
         if (current == null) {
-            session.value = SortSession(tracks, sorted = alreadySorted).startAtFirstPending()
+            rememberLoadOrder(tracks)
+            session.value = SortSession(tracks, sorted = alreadySorted).inQueueOrder().startAtFirstPending()
             if (!started) {
                 started = true
                 // Wait for stored settings so autoplay/tutorial use the user's choice, not the defaults.
@@ -354,7 +396,8 @@ class SwipeViewModel @Inject constructor(
             }
         } else {
             val wasWaiting = current.isFinished
-            session.value = current.append(tracks)
+            rememberLoadOrder(tracks)
+            session.value = current.append(tracks).inQueueOrder()
             if (wasWaiting && session.value?.isFinished == false) onTrackChanged()
         }
     }

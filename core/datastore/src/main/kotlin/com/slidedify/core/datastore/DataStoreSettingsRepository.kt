@@ -42,6 +42,7 @@ internal data class StoredSettings(
     val suggestions: Boolean = true,
     val recent: List<StoredRecent> = emptyList(),
     val lastProvider: String? = null,
+    val queueOrders: Map<String, String> = emptyMap(),
 )
 
 @Serializable
@@ -96,6 +97,7 @@ internal object SettingsMapper {
         suggestions = stored.suggestions,
         recent = stored.recent.mapNotNull { it.toDomain() },
         lastProvider = stored.lastProvider?.let(::ProviderId),
+        queueOrders = stored.queueOrders,
     )
 
     fun toStored(settings: SortSettings) = StoredSettings(
@@ -111,6 +113,7 @@ internal object SettingsMapper {
         suggestions = settings.suggestions,
         recent = settings.recent.map { it.toStored() },
         lastProvider = settings.lastProvider?.value,
+        queueOrders = settings.queueOrders,
     )
 
     fun decode(raw: String?): SortSettings = try {

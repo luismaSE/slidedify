@@ -29,6 +29,8 @@ data class SortSettings(
     val recent: List<RecentSource> = emptyList(),
     /** Service the user picked last, restored on the next launch. */
     val lastProvider: ProviderId? = null,
+    /** Order chosen for each source's queue ("provider|sourceKey" to e.g. "Added:desc"). */
+    val queueOrders: Map<String, String> = emptyMap(),
 ) {
     /**
      * Gesture map for [provider], keeping only playlists that still exist.

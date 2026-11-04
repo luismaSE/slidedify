@@ -23,6 +23,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.slidedify.core.designsystem.CancelColor
 import com.slidedify.core.designsystem.SkipColor
 import com.slidedify.core.designsystem.color
 import com.slidedify.core.domain.gesture.Sector
@@ -39,10 +40,18 @@ internal val ContourCorner = 28.dp
 /** A swipe zone as seen from the centre of the screen. */
 internal data class Zone(val sector: Sector, val centerDegrees: Float, val halfWidth: Float, val color: Color, val label: String)
 
-internal fun swipeZones(targets: List<SlotTarget>, layout: SectorLayout): List<Zone> {
+/** [withCancel]: the grey zone split into "Omitir" and "Cancelar", as while dragging with a selection. */
+internal fun swipeZones(targets: List<SlotTarget>, layout: SectorLayout, withCancel: Boolean = false): List<Zone> {
     val half = layout.sectorWidth / 2f
-    return targets.map { Zone(Sector.Destination(it.slot), layout.centerOf(it.slot), half, it.slot.color(), it.label) } +
-        Zone(Sector.Skip, layout.extraCenter, half, SkipColor, "Omitir")
+    val destinations = targets.map { Zone(Sector.Destination(it.slot), layout.centerOf(it.slot), half, it.slot.color(), it.label) }
+    return destinations + if (withCancel) {
+        listOf(
+            Zone(Sector.Skip, layout.wheelSkipCenter, half / 2f, SkipColor, "Omitir"),
+            Zone(Sector.Cancel, layout.wheelCancelCenter, half / 2f, CancelColor, "Cancelar"),
+        )
+    } else {
+        listOf(Zone(Sector.Skip, layout.extraCenter, half, SkipColor, "Omitir"))
+    }
 }
 
 /**
@@ -51,16 +60,24 @@ internal fun swipeZones(targets: List<SlotTarget>, layout: SectorLayout): List<Z
  * its name appears inside that zone. Drawn in front of the card so it's never hidden.
  */
 @Composable
-internal fun EdgeGlow(zones: List<Zone>, hovered: Sector?, modifier: Modifier = Modifier, suggested: Sector? = null) {
+internal fun EdgeGlow(
+    zones: List<Zone>,
+    hovered: Sector?,
+    modifier: Modifier = Modifier,
+    suggested: Sector? = null,
+    /** Zones picked during a multi-select drag: lit, with their names. */
+    selected: Set<Sector> = emptySet(),
+) {
     val textMeasurer = rememberTextMeasurer()
     Canvas(modifier) {
         val center = Offset(size.width / 2f, size.height / 2f)
         val inset = ContourInset.toPx()
         val contour = RoundRect(inset, inset, size.width - inset, size.height - inset, CornerRadius(ContourCorner.toPx()))
+        val active = hovered != null || selected.isNotEmpty()
         zones.forEach { zone ->
-            val isHovered = zone.sector == hovered
+            val isHovered = zone.sector == hovered || zone.sector in selected
             val alpha = when {
-                hovered == null -> 0.85f
+                !active -> 0.85f
                 isHovered -> 1f
                 else -> 0.3f
             }
@@ -69,7 +86,7 @@ internal fun EdgeGlow(zones: List<Zone>, hovered: Sector?, modifier: Modifier = 
                     // Soft halo around the lit segment.
                     drawContour(contour, zone.color.copy(alpha = 0.25f), 14.dp.toPx())
                     drawContour(contour, zone.color, 6.dp.toPx())
-                } else if (hovered == null && zone.sector == suggested) {
+                } else if (!active && zone.sector == suggested) {
                     // The suggested zone glows a little while idle.
                     drawContour(contour, zone.color.copy(alpha = 0.18f), 12.dp.toPx())
                     drawContour(contour, zone.color, 5.dp.toPx())
@@ -78,7 +95,10 @@ internal fun EdgeGlow(zones: List<Zone>, hovered: Sector?, modifier: Modifier = 
                 }
             }
         }
-        zones.firstOrNull { it.sector == hovered }?.let { drawZoneLabel(textMeasurer, it, center) }
+        zones.filter { it.sector == hovered || it.sector in selected }.forEach { zone ->
+            val prefix = if (zone.sector in selected) "✓ " else ""
+            drawZoneLabel(textMeasurer, zone.copy(label = prefix + zone.label), center)
+        }
     }
 }
 

@@ -58,7 +58,7 @@ class DeezerPreviewSourceTest {
     @Test
     fun `falls back to a loose search when the strict one finds nothing`() = runTest {
         respond("""{"data":[]}""")
-        respond("""{"data":[{"title":"Take On Me","duration":225,"preview":"loose.mp3"}]}""")
+        respond("""{"data":[{"title":"Take On Me","duration":225,"preview":"loose.mp3","artist":{"name":"a-ha"}}]}""")
 
         assertEquals("loose.mp3", source.previewUrl(track))
         server.takeRequest()
@@ -95,5 +95,31 @@ class DeezerPreviewSourceTest {
         val result = features.features(track)!!
         assertNull(result.bpm)
         assertNull(result.loudness)
+    }
+
+    @Test
+    fun `the ISRC gives the exact recording`() = runTest {
+        respond("""{"id":9,"title":"Take On Me","duration":225,"preview":"exact.mp3","artist":{"name":"a-ha"}}""")
+        assertEquals("exact.mp3", source.previewUrl(track.copy(isrc = "NOA028500001")))
+        assertEquals("/track/isrc:NOA028500001", server.takeRequest().url.encodedPath)
+    }
+
+    @Test
+    fun `an unknown ISRC falls back to the search`() = runTest {
+        respond("""{"error":{"type":"DataException","message":"no data","code":800}}""")
+        respond("""{"data":[{"title":"Take On Me","duration":225,"preview":"found.mp3","artist":{"name":"a-ha"}}]}""")
+        assertEquals("found.mp3", source.previewUrl(track.copy(isrc = "XX0000000000")))
+    }
+
+    @Test
+    fun `other artists and extra versions are not taken`() = runTest {
+        respond(
+            """{"data":[
+              {"title":"Take On Me","duration":225,"preview":"cover.mp3","artist":{"name":"Weezer"}},
+              {"title":"Take On Me - Remix","duration":225,"preview":"remix.mp3","artist":{"name":"a-ha"}},
+              {"title":"Take On Me","duration":229,"preview":"original.mp3","artist":{"name":"a-ha"}}
+            ]}""",
+        )
+        assertEquals("original.mp3", source.previewUrl(track))
     }
 }

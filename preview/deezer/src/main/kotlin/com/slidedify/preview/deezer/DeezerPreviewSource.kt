@@ -3,6 +3,7 @@ package com.slidedify.preview.deezer
 import com.slidedify.core.domain.player.PreviewSource
 import com.slidedify.core.domain.suggest.FeatureSource
 import com.slidedify.core.domain.suggest.TrackFeatures
+import com.slidedify.core.domain.suggest.normalizeText
 import com.slidedify.core.model.Track
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -37,22 +38,34 @@ internal data class DeezerTrack(
 @Serializable
 internal data class DeezerSearch(val data: List<DeezerTrack> = emptyList())
 
-/** Finds a song in Deezer's public catalog (no key needed), matching artist, title and duration. */
+/**
+ * Finds a song in Deezer's public catalog (no key needed). By ISRC first (the exact recording),
+ * then by search: the artist must match, an exact title wins, and versions the original doesn't
+ * have ("live", "remix", "karaoke"…) lose points, so the preview is the same recording.
+ */
 internal class DeezerCatalog(private val client: OkHttpClient, private val baseUrl: HttpUrl) {
     private val json = Json { ignoreUnknownKeys = true }
 
     /** Blocking; call from an IO dispatcher. Throws IOException on network errors. */
     fun match(track: Track): DeezerTrack? {
+        track.isrc?.takeIf { it.isNotBlank() }?.let { isrc ->
+            byIsrc(isrc)?.takeIf { it.hasPreview && durationFits(it, track, ISRC_DURATION_SECONDS) }?.let { return it }
+        }
         val artist = track.artists.firstOrNull()?.name.orEmpty()
         // Strict query first ("Song - Remastered 2011" style suffixes are cut), then a loose one.
-        val title = track.title.substringBefore(" - ").substringBefore(" (").trim()
+        val title = cleanTitle(track.title)
         return search("artist:\"$artist\" track:\"$title\"", track) ?: search("$artist $title", track)
     }
 
-    fun details(id: Long): DeezerTrack? {
-        val url = baseUrl.newBuilder().addPathSegment("track").addPathSegment(id.toString()).build()
+    fun details(id: Long): DeezerTrack? = fetchTrack(id.toString())
+
+    private fun byIsrc(isrc: String): DeezerTrack? = runCatching { fetchTrack("isrc:$isrc") }.getOrNull()
+
+    private fun fetchTrack(idOrIsrc: String): DeezerTrack? {
+        val url = baseUrl.newBuilder().addPathSegment("track").addPathSegment(idOrIsrc).build()
         client.newCall(Request.Builder().url(url).build()).execute().use { response ->
             if (!response.isSuccessful) throw IOException("Deezer ${response.code}")
+            // Unknown ids come back as {"error":{…}}, which parses to id 0.
             return json.decodeFromString(DeezerTrack.serializer(), response.body.string()).takeIf { it.id != 0L }
         }
     }
@@ -62,16 +75,49 @@ internal class DeezerCatalog(private val client: OkHttpClient, private val baseU
         client.newCall(Request.Builder().url(url).build()).execute().use { response ->
             if (!response.isSuccessful) return null
             val results = json.decodeFromString(DeezerSearch.serializer(), response.body.string()).data
+            val wantedTitle = normalizeText(cleanTitle(track.title))
+            val wantedArtists = track.artists.map { normalizeText(it.name) }.filter { it.isNotEmpty() }
+            val originalWords = normalizeText(track.title).split(' ').toSet()
             val seconds = track.durationMs / 1000.0
             return results
-                .filter { !it.preview.isNullOrBlank() }
-                .filter { track.durationMs <= 0 || abs(it.duration - seconds) <= MAX_DURATION_DIFF_SECONDS }
-                .minByOrNull { abs(it.duration - seconds) }
+                .filter { it.hasPreview && durationFits(it, track, MAX_DURATION_DIFF_SECONDS) }
+                .mapNotNull { candidate ->
+                    val artist = normalizeText(candidate.artist.name)
+                    val artistScore = when {
+                        wantedArtists.isEmpty() -> 0
+                        wantedArtists.any { it == artist } -> 2
+                        wantedArtists.any { artist.isNotEmpty() && (it.contains(artist) || artist.contains(it)) } -> 1
+                        else -> return@mapNotNull null // Another artist: never a match.
+                    }
+                    val title = normalizeText(candidate.title)
+                    val titleScore = when {
+                        title == wantedTitle || normalizeText(cleanTitle(candidate.title)) == wantedTitle -> 3
+                        title.contains(wantedTitle) || wantedTitle.contains(title) -> 1
+                        else -> return@mapNotNull null
+                    }
+                    val versionPenalty = VERSION_WORDS.count { it in title.split(' ') && it !in originalWords } * 2
+                    candidate to (artistScore + titleScore - versionPenalty)
+                }
+                .sortedWith(compareByDescending<Pair<DeezerTrack, Int>> { it.second }.thenBy { abs(it.first.duration - seconds) })
+                .firstOrNull()
+                ?.first
         }
     }
 
+    private val DeezerTrack.hasPreview: Boolean get() = !preview.isNullOrBlank()
+
+    private fun durationFits(candidate: DeezerTrack, track: Track, maxSeconds: Double) =
+        track.durationMs <= 0 || candidate.duration <= 0 || abs(candidate.duration - track.durationMs / 1000.0) <= maxSeconds
+
+    private fun cleanTitle(title: String) = title.substringBefore(" - ").substringBefore(" (").substringBefore(" [").trim()
+
     private companion object {
         const val MAX_DURATION_DIFF_SECONDS = 6.0
+        const val ISRC_DURATION_SECONDS = 15.0
+        val VERSION_WORDS = setOf(
+            "live", "vivo", "remix", "mix", "karaoke", "instrumental", "acoustic", "acustico", "cover",
+            "version", "sped", "slowed", "reverb", "edit", "demo", "remastered", "remaster", "tribute",
+        )
     }
 }
 

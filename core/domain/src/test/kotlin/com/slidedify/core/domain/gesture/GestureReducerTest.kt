@@ -93,6 +93,57 @@ class GestureReducerTest {
         assertEquals(Sector.Skip, single.classifySwipe(Point(-400f, 0f), Point.Zero))
     }
 
+    // --- Multi-select by dragging, without the wheel ------------------------------------------
+
+    private val far = 350f
+
+    @Test
+    fun `dragging on from one playlist to another adds to both`() {
+        val steps = run(downAt(), moveBy(Point(0f, -far)), moveBy(Point(far, 0f)), upBy(Point(far, 0f)))
+        assertEquals(GestureOutcome.WheelCommit(setOf(UP, RIGHT)), steps.last().outcome)
+        assertEquals(GestureFeedback.SlotSelected, steps[1].feedback)
+        assertEquals(GestureFeedback.SlotSelected, steps[2].feedback)
+    }
+
+    @Test
+    fun `sliding back into a selected playlist deselects it`() {
+        val steps = run(downAt(), moveBy(Point(0f, -far)), moveBy(Point(far, 0f)), moveBy(Point(0f, -far)), upBy(Point(0f, -far)))
+        assertEquals(GestureOutcome.Swipe(RIGHT), steps.last().outcome)
+        assertEquals(GestureFeedback.SlotDeselected, steps[3].feedback)
+    }
+
+    @Test
+    fun `the cancel half clears the selection and releasing there does nothing`() {
+        val lower = Point(-far, far * 0.55f) // grey zone, lower half: cancel
+        val steps = run(downAt(), moveBy(Point(0f, -far)), moveBy(lower), upBy(lower))
+        assertEquals(GestureFeedback.EnteredCancel, steps[2].feedback)
+        assertEquals(GestureOutcome.WheelCancelled, steps.last().outcome)
+    }
+
+    @Test
+    fun `without a selection the whole grey zone skips`() {
+        val lower = Point(-far, far * 0.55f)
+        val steps = run(downAt(), moveBy(lower), upBy(lower))
+        assertEquals(GestureOutcome.Skip, steps.last().outcome)
+        val upper = Point(-far, -far * 0.55f)
+        assertEquals(GestureOutcome.Skip, run(downAt(), moveBy(upper), upBy(upper)).last().outcome)
+    }
+
+    @Test
+    fun `selecting and coming back to the start springs back`() {
+        val steps = run(downAt(), moveBy(Point(0f, -far)), moveBy(Point(0f, -40f)), upBy(Point(0f, -40f)))
+        assertEquals(GestureOutcome.SwipeAborted, steps.last().outcome)
+    }
+
+    @Test
+    fun `selecting and then deselecting the only playlist adds nothing`() {
+        val steps = run(
+            downAt(), moveBy(Point(0f, -far)), moveBy(Point(0f, -40f)), moveBy(Point(0f, -far)), upBy(Point(0f, -far * 0.9f)),
+        )
+        assertEquals(GestureFeedback.SlotDeselected, steps[3].feedback)
+        assertEquals(GestureOutcome.SwipeAborted, steps.last().outcome)
+    }
+
     @Test
     fun `moving before the hold timeout starts a drag instead of the wheel`() {
         val steps = run(downAt(), moveBy(Point(30f, 0f)), PointerInput.HoldTimeout)

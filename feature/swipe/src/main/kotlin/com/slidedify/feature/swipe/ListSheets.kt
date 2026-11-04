@@ -57,25 +57,34 @@ import java.text.DateFormat
 import java.util.Date
 
 /**
- * Whole queue of the source: ✓ reviewed, ○ pending, ▶ current. Can be ordered (list order,
- * recently added, title, artist, album, duration; both directions), filtered and searched.
- * Tapping a song continues sorting from there.
+ * Whole queue of the source: ✓ reviewed, ○ pending, ▶ current. The order chosen here is the
+ * order songs come up for sorting (list order, recently added, title, artist, album, duration;
+ * both directions). It can also be filtered and searched. Tapping a song continues from there.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun TrackListSheet(
     state: SwipeUiState,
-    options: TrackListOptions,
-    onOptionsChange: (TrackListOptions) -> Unit,
+    filters: TrackListOptions,
+    onFiltersChange: (TrackListOptions) -> Unit,
+    onOrderChange: (TrackOrder, Boolean) -> Unit,
     onPick: (Int) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val rows = remember(state.queue, state.sortedIds, options) { arrangeTracks(state.queue, state.sortedIds, options) }
+    // The queue itself is already in the chosen order; here it is only filtered and searched.
+    val options = filters.copy(order = state.queueOrder, descending = state.queueDescending)
+    val rows = remember(state.queue, state.sortedIds, filters) {
+        arrangeTracks(state.queue, state.sortedIds, filters.copy(order = TrackOrder.Source, descending = false))
+    }
     val listState = rememberLazyListState()
-    // In list order, open around the current song; otherwise from the top.
+    // Open around the current song (it stays current when the order changes).
     LaunchedEffect(options) {
-        val target = if (options.order == TrackOrder.Source && !options.descending) rows.indexOfFirst { it.index == state.position } else 0
+        val target = rows.indexOfFirst { it.index == state.position }.coerceAtLeast(0)
         listState.scrollToItem((target - 2).coerceAtLeast(0))
+    }
+    val onOptionsChange: (TrackListOptions) -> Unit = { changed ->
+        if (changed.order != options.order || changed.descending != options.descending) onOrderChange(changed.order, changed.descending)
+        onFiltersChange(changed.copy(order = TrackOrder.Source, descending = false))
     }
     val pending = state.queue.size - state.sortedCount
     val dateFormat = remember { DateFormat.getDateInstance(DateFormat.MEDIUM) }

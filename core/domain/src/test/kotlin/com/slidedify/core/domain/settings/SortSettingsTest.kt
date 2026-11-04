@@ -77,4 +77,12 @@ class SortSettingsTest {
         assertEquals(SortSettings.MAX_RECENT, settings.recent.size)
         assertEquals("P20", settings.recent.first().title)
     }
+
+    @Test
+    fun `destinations can be moved around the circle`() {
+        val map = GestureMap.of(listOf(id("a"), id("b"), id("c")))
+        assertEquals(GestureMap.of(listOf(id("c"), id("a"), id("b"))), map.move(Slot(2), Slot(0)))
+        assertEquals(GestureMap.of(listOf(id("b"), id("a"), id("c"))), map.move(Slot(0), Slot(1)))
+        assertEquals(map, map.move(Slot(0), Slot(5)))
+    }
 }

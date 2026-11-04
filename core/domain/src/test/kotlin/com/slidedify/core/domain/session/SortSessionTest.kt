@@ -99,6 +99,31 @@ class SortSessionTest {
     }
 
     @Test
+    fun `after jumping ahead, the earlier pending tracks are still sorted`() {
+        val jumped = session.jumpTo(2)
+        val next = jumped.decide(Decision.Skip).session
+        assertEquals(track(1), next.current)
+        assertFalse(next.isFinished)
+    }
+
+    @Test
+    fun `reordering keeps the current track and the next ones follow the new order`() {
+        val reversed = session.decide(Decision.Skip).session // at t2
+            .reordered(compareByDescending { it.id.value })
+        assertEquals(listOf(track(3), track(2), track(1)), reversed.tracks)
+        assertEquals(track(2), reversed.current)
+        // t1 was reviewed; t3 is before the cursor now, so it comes back after t2.
+        assertEquals(track(3), reversed.decide(Decision.Skip).session.current)
+    }
+
+    @Test
+    fun `undo finds the track after a reorder`() {
+        val decided = session.decide(Decision.Skip).session
+        val undone = decided.reordered(compareByDescending { it.id.value }).undo().session
+        assertEquals(track(1), undone.current)
+    }
+
+    @Test
     fun `jumping back to a reviewed track and deciding again keeps it reviewed after undo`() {
         val base = SortSession(listOf(track(1), track(2)), sorted = setOf(TrackId("t1"))).startAtFirstPending()
         val jumped = base.jumpTo(0)

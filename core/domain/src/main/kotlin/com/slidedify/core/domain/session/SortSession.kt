@@ -78,6 +78,18 @@ data class SortSession(
     /** Jump to any track from the list, reviewed or not. */
     fun jumpTo(index: Int): SortSession = if (index in tracks.indices) copy(position = index) else this
 
+    /**
+     * Same tracks in another order (by date, title…). The current track stays current, so the
+     * user keeps their place; what comes next follows the new order.
+     */
+    fun reordered(comparator: Comparator<Track>): SortSession {
+        val now = current
+        val ordered = tracks.sortedWith(comparator)
+        val moved = copy(tracks = ordered)
+        val index = now?.let { track -> ordered.indexOfFirst { it.id == track.id } } ?: -1
+        return if (index >= 0) moved.copy(position = index) else moved.copy(position = moved.nextPendingFrom(0))
+    }
+
     fun decide(decision: Decision): SessionUpdate {
         val track = current ?: return SessionUpdate(this, emptyList())
         val effects = when (decision) {
@@ -87,7 +99,7 @@ data class SortSession(
         val nowSorted = sorted + track.id
         val next = copy(
             sorted = nowSorted,
-            position = nextPendingFrom(position + 1, nowSorted),
+            position = nextPendingAfter(position, nowSorted),
             history = history + HistoryEntry.Decided(track, decision, fromIndex = position, wasSorted = track.id in sorted),
         )
         return SessionUpdate(next, effects)
@@ -115,7 +127,9 @@ data class SortSession(
                     is Decision.AddTo -> listOf(LibraryEffect.RemoveFromPlaylists(last.track, decision.playlists))
                 }
                 val restoredSorted = if (last.wasSorted) sorted else sorted - last.track.id
-                SessionUpdate(copy(position = last.fromIndex, history = rest, sorted = restoredSorted), effects)
+                // Find the track itself: the queue may have been reordered since.
+                val back = tracks.indexOfFirst { it.id == last.track.id }.takeIf { it >= 0 } ?: last.fromIndex
+                SessionUpdate(copy(position = back, history = rest, sorted = restoredSorted), effects)
             }
 
             is HistoryEntry.LikeToggled -> {
@@ -127,6 +141,17 @@ data class SortSession(
                 )
             }
         }
+    }
+
+    /**
+     * Next pending track after [index]; when there is none further down (for example after
+     * jumping ahead from the list), it goes back to the first one still pending earlier.
+     */
+    private fun nextPendingAfter(index: Int, sortedSet: Set<TrackId>): Int {
+        val ahead = nextPendingFrom(index + 1, sortedSet)
+        if (ahead < tracks.size) return ahead
+        val earlier = nextPendingFrom(0, sortedSet)
+        return if (earlier < index) earlier else tracks.size
     }
 
     /** First index >= [from] whose track isn't reviewed; `tracks.size` when there is none. */

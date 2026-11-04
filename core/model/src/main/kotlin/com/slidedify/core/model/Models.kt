@@ -91,6 +91,15 @@ data class GestureMap(
 
     fun remove(slot: Slot): GestureMap = GestureMap(destinations.filterIndexed { index, _ -> index != slot.index })
 
+    /** Moves a destination to another place on the circle (the others shift to make room). */
+    fun move(from: Slot, to: Slot): GestureMap {
+        if (from.index !in destinations.indices || to.index !in destinations.indices || from == to) return this
+        val list = destinations.toMutableList()
+        val moved = list.removeAt(from.index)
+        list.add(to.index, moved)
+        return GestureMap(list)
+    }
+
     /** Drops playlists that no longer exist, and destinations left empty. */
     fun retainOnly(existing: Set<PlaylistId>): GestureMap =
         GestureMap(destinations.map { it intersect existing }.filter { it.isNotEmpty() })

@@ -421,6 +421,27 @@ class SwipeViewModelTest {
     }
 
     @Test
+    fun `choosing an order in the list reorders what comes next, and is remembered`() = runTest(dispatcher) {
+        val vm = viewModel()
+        collect(vm)
+
+        vm.setQueueOrder(TrackOrder.Title, descending = true)
+
+        assertEquals(listOf("Song 3", "Song 2", "Song 1"), vm.uiState.value.queue.map { it.title })
+        assertEquals(tracks[0], vm.uiState.value.current) // stays on the current song
+        assertEquals(TrackOrder.Title, vm.uiState.value.queueOrder)
+
+        // Jump to the first one of the new order and sort it: the others still come up.
+        vm.jumpTo(0)
+        vm.onSkip()
+        assertEquals(tracks[1], vm.uiState.value.current)
+        vm.onSkip()
+        assertEquals(tracks[0], vm.uiState.value.current)
+
+        assertEquals("Title:desc", settings.state.value.queueOrders.values.single())
+    }
+
+    @Test
     fun `no suggestion when they are turned off`() = runTest(dispatcher) {
         useDestinations("gym", "chill")
         val vm = viewModel()

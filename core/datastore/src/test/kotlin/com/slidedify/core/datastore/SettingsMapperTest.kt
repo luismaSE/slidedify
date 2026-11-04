@@ -30,6 +30,7 @@ class SettingsMapperTest {
                 RecentSource(ProviderId("demo"), TrackSource.LikedSongs, "Me gusta", openedAt = 500),
             ),
             lastProvider = ProviderId("spotify"),
+            queueOrders = mapOf("spotify|liked" to "Added:desc"),
         )
         assertEquals(settings, SettingsMapper.decode(SettingsMapper.encode(settings)))
     }

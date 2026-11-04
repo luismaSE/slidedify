@@ -122,6 +122,7 @@ data class SwipeActions(
     val onJumpTo: (Int) -> Unit = {},
     val onAcceptSuggestion: () -> Unit = {},
     val onSendTo: (Set<PlaylistId>) -> Unit = {},
+    val onQueueOrder: (TrackOrder, Boolean) -> Unit = { _, _ -> },
 )
 
 @Composable
@@ -167,6 +168,7 @@ fun SwipeRoute(onBack: () -> Unit, onOpenSettings: () -> Unit, viewModel: SwipeV
             onJumpTo = viewModel::jumpTo,
             onAcceptSuggestion = viewModel::onAcceptSuggestion,
             onSendTo = viewModel::onSendTo,
+            onQueueOrder = viewModel::setQueueOrder,
         ),
     )
 }
@@ -233,8 +235,9 @@ fun SwipeScreen(state: SwipeUiState, actions: SwipeActions, notice: String? = nu
     if (showList) {
         TrackListSheet(
             state = state,
-            options = listOptions,
-            onOptionsChange = { listOptions = it },
+            filters = listOptions,
+            onFiltersChange = { listOptions = it },
+            onOrderChange = actions.onQueueOrder,
             onPick = { index ->
                 actions.onJumpTo(index)
                 showList = false
@@ -372,8 +375,27 @@ private fun GestureArea(
                 }
 
                 GestureOutcome.SwipeAborted -> scope.launch { cardOffset.animateTo(Offset.Zero, spring()) }
-                is GestureOutcome.WheelCommit -> actions.onWheelCommit(outcome.slots)
-                GestureOutcome.WheelCancelled, GestureOutcome.WheelDismissed, null -> Unit
+                is GestureOutcome.WheelCommit -> {
+                    val drag = previous as? GestureState.Dragging
+                    if (drag == null) {
+                        actions.onWheelCommit(outcome.slots)
+                    } else {
+                        // Multi-select drag: the card flies towards the last zone, then goes to all of them.
+                        scope.launch {
+                            cardOffset.snapTo(drag.offset.toOffset())
+                            val toward = (drag.hovered as? Sector.Destination)?.slot ?: outcome.slots.first()
+                            cardOffset.animateTo(flyOutTarget(layout.centerOf(toward), flyDistance), tween(180))
+                            actions.onWheelCommit(outcome.slots)
+                            cardOffset.snapTo(Offset.Zero)
+                        }
+                    }
+                }
+
+                GestureOutcome.WheelCancelled -> if (previous is GestureState.Dragging) {
+                    scope.launch { cardOffset.animateTo(Offset.Zero, spring()) }
+                }
+
+                GestureOutcome.WheelDismissed, null -> Unit
             }
         }
         val latestHandleStep by rememberUpdatedState(handleStep)
@@ -382,11 +404,15 @@ private fun GestureArea(
                 .fillMaxSize()
                 .sortGestures(config) { latestHandleStep(it) },
         ) {
-            val zones = remember(state.targets, layout) { swipeZones(state.targets, layout) }
-            val hoveredZone = (gesture as? GestureState.Dragging)
-                ?.offset
-                ?.takeIf { it.length >= config.touchSlop * 3 }
-                ?.let { layout.sectorOf(it) }
+            val drag = gesture as? GestureState.Dragging
+            val splitGrey = drag?.hadSelection == true
+            val zones = remember(state.targets, layout, splitGrey) { swipeZones(state.targets, layout, withCancel = splitGrey) }
+            // Before reaching a zone, preview where the drag is heading.
+            val hoveredZone = drag?.let { d ->
+                d.hovered?.let { if (!splitGrey && it == Sector.Cancel) Sector.Skip else it }
+                    ?: d.offset.takeIf { it.length >= config.touchSlop * 3 }?.let { layout.sectorOf(it) }
+            }
+            val selectedZones = drag?.selected?.mapTo(mutableSetOf<Sector>()) { Sector.Destination(it) }.orEmpty()
             // A hint of the next card underneath, so the queue feels like a deck.
             if (state.position + 1 < state.total) {
                 Box(
@@ -415,7 +441,13 @@ private fun GestureArea(
             )
 
             // In front of the card: the contour line and the zone name must never be hidden.
-            EdgeGlow(zones, hoveredZone, Modifier.fillMaxSize(), suggested = state.suggestion?.let { Sector.Destination(it.slot) })
+            EdgeGlow(
+                zones,
+                hoveredZone,
+                Modifier.fillMaxSize(),
+                suggested = state.suggestion?.let { Sector.Destination(it.slot) },
+                selected = selectedZones,
+            )
 
             state.tutorialStep?.let { step ->
                 if (gesture == GestureState.Idle) {
@@ -425,7 +457,7 @@ private fun GestureArea(
 
             if (gesture == GestureState.Idle && state.tutorialStep == null) {
                 Text(
-                    if (state.targets.isEmpty()) "Agregá una playlist con + para empezar" else "Mantené presionado para elegir varias playlists",
+                    if (state.targets.isEmpty()) "Agregá una playlist con + para empezar" else "Deslizá por varias zonas sin soltar, o mantené para la rueda",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier

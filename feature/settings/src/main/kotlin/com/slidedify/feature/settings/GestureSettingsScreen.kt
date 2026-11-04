@@ -46,6 +46,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -136,6 +137,8 @@ class GestureSettingsViewModel @Inject constructor(
     fun addDestination(ids: Set<PlaylistId>) = editMap { it.add(ids) }
 
     fun removeDestination(slot: Slot) = editMap { it.remove(slot) }
+
+    fun moveDestination(from: Slot, to: Slot) = editMap { it.move(from, to) }
 
     private fun editMap(edit: (GestureMap) -> GestureMap) {
         val (provider, playlists) = library.value
@@ -402,6 +405,7 @@ fun DestinationsRoute(onBack: () -> Unit, viewModel: GestureSettingsViewModel = 
         onAssign = viewModel::assign,
         onAddDestination = viewModel::addDestination,
         onRemoveDestination = viewModel::removeDestination,
+        onMoveDestination = viewModel::moveDestination,
         onResetMap = viewModel::resetGestureMap,
     )
 }
@@ -414,6 +418,7 @@ fun DestinationsScreen(
     onAssign: (Slot, Set<PlaylistId>) -> Unit,
     onAddDestination: (Set<PlaylistId>) -> Unit,
     onRemoveDestination: (Slot) -> Unit,
+    onMoveDestination: (Slot, Slot) -> Unit,
     onResetMap: () -> Unit,
 ) {
     // null = closed, NEW = adding a destination, otherwise the slot being edited.
@@ -446,6 +451,7 @@ fun DestinationsScreen(
                     SectorPreview(state.gestureMap.size, state.settings.leftHanded, size = 168.dp)
                     Text(
                         "El círculo se reparte en partes iguales entre tus destinos y la zona gris de omitir. " +
+                            "Con las flechas cambiás su lugar (en sentido horario, empezando junto a la zona gris). " +
                             "Un destino puede mandar a varias playlists a la vez.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -480,6 +486,16 @@ fun DestinationsScreen(
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
+                        }
+                        // Move around the circle (clockwise, starting next to the grey zone): earlier / later.
+                        IconButton(onClick = { onMoveDestination(slot, Slot(slot.index - 1)) }, enabled = slot.index > 0) {
+                            Icon(AppIcons.Chevron, contentDescription = "Mover antes en el círculo", modifier = Modifier.rotate(-90f))
+                        }
+                        IconButton(
+                            onClick = { onMoveDestination(slot, Slot(slot.index + 1)) },
+                            enabled = slot.index < state.gestureMap.size - 1,
+                        ) {
+                            Icon(AppIcons.Chevron, contentDescription = "Mover después en el círculo", modifier = Modifier.rotate(90f))
                         }
                         IconButton(onClick = { onRemoveDestination(slot) }) {
                             Icon(AppIcons.Close, contentDescription = "Quitar destino", tint = MaterialTheme.colorScheme.onSurfaceVariant)

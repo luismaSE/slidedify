@@ -32,8 +32,36 @@ fun availableOrders(queue: List<Track>): List<TrackOrder> =
     TrackOrder.entries.filter { it != TrackOrder.Added || queue.any { track -> track.addedAt != null } }
 
 /**
+ * Comparator for [order]; [position] gives a track's place in the original list. Songs without
+ * the sorted-by value (no date) go last in both directions.
+ */
+fun trackComparator(order: TrackOrder, descending: Boolean, position: (Track) -> Int): Comparator<Track> {
+    val collator = Collator.getInstance(Locale("es")).apply { strength = Collator.PRIMARY }
+    val text = compareBy<String, String>(collator) { it }
+    val base: Comparator<Track> = when (order) {
+        TrackOrder.Source -> compareBy(position)
+        TrackOrder.Added -> compareBy { it.addedAt ?: 0L }
+        TrackOrder.Title -> compareBy(text) { it.title }
+        TrackOrder.Artist -> compareBy<Track, String>(text) { it.artistNames }.thenBy(text) { it.album.name }
+        TrackOrder.Album -> compareBy<Track, String>(text) { it.album.name }.thenBy(position)
+        TrackOrder.Duration -> compareBy { it.durationMs }
+    }
+    val directed = if (descending) base.reversed() else base
+    return if (order == TrackOrder.Added) compareBy<Track> { it.addedAt == null }.then(directed) else directed
+}
+
+/** Stored as "Added:desc" per source. */
+fun encodeOrder(order: TrackOrder, descending: Boolean) = "${order.name}:${if (descending) "desc" else "asc"}"
+
+fun decodeOrder(value: String?): Pair<TrackOrder, Boolean>? {
+    val (name, direction) = value?.split(':')?.takeIf { it.size == 2 } ?: return null
+    val order = TrackOrder.entries.firstOrNull { it.name == name } ?: return null
+    return order to (direction == "desc")
+}
+
+/**
  * The list to show: filtered, searched and ordered. Keeps each song's index in the queue so
- * picking one jumps to the right place. Songs without the sorted-by value go last either way.
+ * picking one jumps to the right place.
  */
 fun arrangeTracks(queue: List<Track>, sorted: Set<TrackId>, options: TrackListOptions): List<IndexedValue<Track>> {
     val needle = options.query.trim()
@@ -50,17 +78,7 @@ fun arrangeTracks(queue: List<Track>, sorted: Set<TrackId>, options: TrackListOp
                 track.album.name.contains(needle, ignoreCase = true)
             )
     }
-    val collator = Collator.getInstance(Locale("es")).apply { strength = Collator.PRIMARY }
-    val text = compareBy<String, String>(collator) { it }
-    val comparator: Comparator<IndexedValue<Track>> = when (options.order) {
-        TrackOrder.Source -> compareBy { it.index }
-        TrackOrder.Added -> compareBy { it.value.addedAt ?: Long.MIN_VALUE }
-        TrackOrder.Title -> compareBy(text) { it.value.title }
-        TrackOrder.Artist -> compareBy<IndexedValue<Track>, String>(text) { it.value.artistNames }.thenBy(text) { it.value.album.name }
-        TrackOrder.Album -> compareBy<IndexedValue<Track>, String>(text) { it.value.album.name }.thenBy { it.index }
-        TrackOrder.Duration -> compareBy { it.value.durationMs }
-    }
-    val ordered = visible.sortedWith(if (options.descending) comparator.reversed() else comparator)
-    // Missing dates always at the end, whatever the direction.
-    return if (options.order == TrackOrder.Added) ordered.sortedBy { it.value.addedAt == null } else ordered
+    val indexOf = queue.withIndex().associate { it.value.id to it.index }
+    val comparator = trackComparator(options.order, options.descending) { indexOf[it.id] ?: 0 }
+    return visible.sortedWith(compareBy(comparator) { it.value })
 }
