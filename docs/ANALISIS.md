@@ -1,5 +1,8 @@
 # Análisis de la app y propuestas
 
+> **Documento histórico.** Describe la propuesta o el análisis en su momento; parte ya cambió.
+> El estado actual está en el [README](../README.md); activar servicios, en [SERVICIOS.md](SERVICIOS.md).
+
 Fecha: 2026-11-01 · Estado analizado: rama `claude/spotify-mobile-tinder-gestures-meog4o`.
 
 ## 1. Qué está bien hoy

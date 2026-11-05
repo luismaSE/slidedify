@@ -1,5 +1,8 @@
 # Slidedify — Propuesta de diseño
 
+> **Documento histórico.** Describe la propuesta o el análisis en su momento; parte ya cambió.
+> El estado actual está en el [README](../README.md); activar servicios, en [SERVICIOS.md](SERVICIOS.md).
+
 > App Android para ordenar canciones de Spotify en varias playlists con gestos tipo Tinder.
 > Estado: propuesta v1 · Fecha: 2026-11-01
 

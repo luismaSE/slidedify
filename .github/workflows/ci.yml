@@ -37,6 +37,9 @@ jobs:
           # Optional repository secret; without it the APK only has the Demo provider.
           SPOTIFY_CLIENT_ID: ${{ secrets.SPOTIFY_CLIENT_ID }}
           LASTFM_API_KEY: ${{ secrets.LASTFM_API_KEY }}
+          # Optional: turn on TIDAL / YouTube Music (see docs/SERVICIOS.md).
+          TIDAL_CLIENT_ID: ${{ secrets.TIDAL_CLIENT_ID }}
+          YOUTUBE_ENABLED: ${{ secrets.YOUTUBE_ENABLED }}
         run: ./gradlew :app:assembleDebug
 
       - uses: actions/upload-artifact@v5

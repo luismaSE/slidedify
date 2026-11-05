@@ -18,7 +18,8 @@ class ActiveProviderMemory @Inject constructor(
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
-    fun start() {
+    /** [scope] is replaceable for tests. */
+    fun start(scope: CoroutineScope = this.scope) {
         scope.launch {
             runCatching {
                 settings.settings.first().lastProvider?.let { id -> if (registry.find(id) != null) registry.select(id) }

@@ -27,6 +27,7 @@ include(":app")
 // Pure Kotlin: no Android dependency, unit-tested on the JVM.
 include(":core:model")
 include(":core:domain")
+include(":core:testing")
 include(":core:oauth")
 include(":preview:deezer")
 include(":suggest:lastfm")

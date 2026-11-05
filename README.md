@@ -1,79 +1,79 @@
 # Compass
 
-> Antes llamada Slidedify (el id del paquete sigue siendo `com.slidedify.app`).
+App Android para ordenar tu música en playlists con gestos: una canción por pantalla, la escuchás
+y la mandás a su playlist deslizando. Funciona con Spotify (y está preparada para TIDAL y YouTube
+Music). El id del paquete sigue siendo `com.slidedify.app` (nombre original del proyecto).
 
-App Android para ordenar canciones de Spotify en varias playlists con gestos tipo Tinder:
-una canción por pantalla, se reproduce sola, y cada gesto la manda a la playlist configurada.
+📲 Última versión de prueba: [slidedify-debug.apk](https://github.com/luismaSE/slidedify/releases/download/debug-latest/slidedify-debug.apk)
 
-- Swipe hacia un destino lo agrega a esa playlist. El círculo se reparte en partes iguales entre las
-  playlists y una zona de **omitir** (1 playlist: mitades, 2: tercios, 3: cuartos… máximo 8).
-  El borde de la pantalla se ilumina con el color de cada zona; al arrastrar, el nombre aparece en la zona.
-- **✕ Omitir** abajo a la izquierda, **+ Playlist** abajo a la derecha (agregar o crear destinos).
-- **Mantener presionado** abre una rueda tipo joystick donde está el dedo: empujar y volver al centro
-  marca varias playlists; soltar las confirma. La zona izquierda se divide en Omitir (arriba) y Cancelar (abajo).
-- Doble tap ♥ Me gusta · tap play/pausa · ↶ deshacer.
+## Qué hace
 
-- **⇄ Transferir**: copiar, mover o sincronizar playlists (o Me gusta) entre servicios conectados.
+**Ordenar**
+- Deslizar hacia una playlist la agrega ahí. El círculo se reparte entre tus destinos (hasta 8) y
+  una zona gris de **omitir**; el borde de la pantalla muestra el color de cada zona.
+- **Varias a la vez**: sin soltar, pasá por varias zonas (como en la rueda). Volver a pasar por una
+  la quita; con algo elegido, la zona gris se divide en *Omitir* y *Cancelar*.
+- **Rueda** (mantener apretado), botón **Varias** con casillas, doble toque = Me gusta, deshacer.
+- **Mover en vez de copiar** (opcional): al ordenar una playlist tuya, la canción sale de ella.
+- Vista previa de 30 s (Deezer, buscada por ISRC para que sea la misma grabación) y botón para
+  escuchar la canción completa en Spotify.
+- Lista de canciones con orden (lista, agregadas, título, artista, álbum, duración; ↑/↓), filtros
+  y búsqueda. El orden elegido es el orden en que salen las canciones y se recuerda por lista.
 
-📄 Análisis y propuestas de mejora: [docs/ANALISIS.md](docs/ANALISIS.md)
-📄 Propuesta de diseño, stack y arquitectura: [docs/PROPUESTA.md](docs/PROPUESTA.md)
+**Sugerencias**: propone la playlist que mejor encaja con cada canción y explica por qué
+(ver [Sugerencias](#sugerencias)).
 
-## Estado
+**Inicio**: "Seguí donde quedaste", recientes, tus playlists y las que seguís, con progreso.
+**Transferir**: copiar, mover o sincronizar playlists entre servicios. **Conexiones** y **Ajustes**
+(gestos, accesibilidad, tema claro/oscuro, sugerencias, datos móviles).
 
-| Parte | Estado |
-|---|---|
-| Lógica de gestos (swipe, rueda, doble tap) | ✅ `core:domain`, con tests |
-| Sesión de ordenado con deshacer | ✅ `core:domain`, con tests |
-| Pantalla de swipe + rueda (Compose) | ✅ con datos y reproductor de prueba |
-| Arquitectura multi-proveedor (`MusicProvider` + registro) | ✅ |
-| Proveedor Spotify (login, Web API, vistas previas) | ✅ probado con cuenta real |
-| Transferencias entre servicios (copiar / mover / sincronizar) | 🧪 implementado y testeado, falta probar con dos cuentas reales |
-| TIDAL y YouTube Music | 🧪 clientes testeados; se activan con su configuración (ver docs/ANALISIS.md §6) |
-| Cola offline (Room + WorkManager) | ✅ |
+Además: progreso guardado y copia de seguridad, funciona sin conexión (los cambios se envían en
+tandas), nunca agrega una canción dos veces, horizontal y tablets, español e inglés, y si la app
+se cierra muestra el error para copiarlo o enviarlo.
 
-## Módulos
+## Correrlo en tu PC
 
+1. Instalá [Android Studio](https://developer.android.com/studio) (incluye el JDK y el SDK).
+2. *File → Open* y elegí la carpeta del proyecto. Esperá a que termine el *Gradle sync*.
+3. Conectá tu teléfono por USB con la *depuración USB* activada
+   (Ajustes → Acerca del teléfono → tocá 7 veces "Número de compilación" → Opciones de desarrollador),
+   o creá un emulador en *Device Manager*.
+4. Elegí la configuración **app** y tocá ▶ *Run*.
+
+Si ya tenés instalado el APK de GitHub, se actualiza encima sin perder datos (los dos se firman con
+`debug.keystore`).
+
+Desde la terminal (JDK 21 y Android SDK con API 37):
+
+```bash
+./gradlew test                 # todos los tests unitarios
+./gradlew lintDebug            # análisis estático
+./gradlew :app:installDebug    # compila e instala en el teléfono conectado
 ```
-app/                 Arma la app: DI y registro de proveedores
-core/model/          Modelos puros e independientes del servicio (Track, Playlist, ProviderId, Slot)
-core/domain/         Gestos, sesión con deshacer, contratos: MusicProvider, repositorios, Player, Lyrics
-core/designsystem/   Tema y colores
-feature/swipe/       Pantalla de swipe + rueda joystick y su ViewModel
-provider/fake/       Proveedor de prueba (sin cuenta)
-```
 
-`core:model` y `core:domain` son Kotlin puro: se testean sin emulador.
+## Configuración
 
-### Agregar un proveedor (Spotify, YouTube Music, Tidal…)
+Las claves se leen, en este orden, de `gradle.properties`, `local.properties` (no se sube) o
+variables de entorno; en GitHub Actions, de los secretos del repo.
 
-1. Crear `provider/<nombre>/` como Android library e incluirlo en `settings.gradle.kts`.
-2. Implementar `MusicProvider` (auth, canciones, playlists, biblioteca, reproductor) y declarar sus `ProviderCapabilities`.
-3. Registrarlo con Hilt: `@Binds @IntoSet abstract fun bind(impl: MiProvider): MusicProvider` (ver `provider/fake`).
-4. Agregar `implementation(project(":provider:<nombre>"))` en `app/build.gradle.kts`.
+| Clave | Para qué | Sin ella |
+|---|---|---|
+| `SPOTIFY_CLIENT_ID` | Login con Spotify | Solo el servicio Demo |
+| `LASTFM_API_KEY` | Etiquetas de estilo para sugerencias | Sugiere con artista, audio, tempo y nombre |
+| `TIDAL_CLIENT_ID` | Activa TIDAL | TIDAL aparece como "Próximamente" |
+| `YOUTUBE_ENABLED=true` | Activa YouTube Music | YouTube aparece como "Próximamente" |
 
-La pantalla de swipe y el dominio no cambian.
+Cómo obtener cada una: Spotify abajo; TIDAL y YouTube en [docs/SERVICIOS.md](docs/SERVICIOS.md);
+Last.fm en <https://www.last.fm/api/account/create> (solo el *API key*).
 
-## Conectar Spotify
+### Spotify
 
-1. Crear una app en el [Spotify Developer Dashboard](https://developer.spotify.com/dashboard)
-   (el dueño necesita Premium; en modo desarrollo se permiten 5 usuarios, que hay que agregar en *User Management*).
-2. Agregar el Redirect URI **`slidedify://spotify-callback`** y marcar **Web API**.
-3. Poner el Client ID en `local.properties` (no se sube al repo):
-   ```properties
-   SPOTIFY_CLIENT_ID=tu_client_id
-   ```
-   En CI se lee del secreto `SPOTIFY_CLIENT_ID`.
+1. Creá una app en el [Spotify Developer Dashboard](https://developer.spotify.com/dashboard).
+2. Redirect URI: **`slidedify://spotify-callback`**; API: **Web API** y **Android**
+   (paquete `com.slidedify.app`, SHA-1 de `debug.keystore`).
+3. En modo desarrollo solo entran las cuentas que agregues en *User Management* (cupo chico).
 
-Sin Client ID la app funciona igual con el proveedor **Demo**. La reproducción con Spotify usa la
-Web API sobre la app de Spotify del teléfono (Premium); algunos endpoints de 2026 están marcados
-"verify" en `SpotifyEndpoints` hasta probarlos con una cuenta real.
-
-## Sugerencias inteligentes
-
-Al ordenar, Compass sugiere a qué playlist va cada canción ("✦ Sugerido: Relax") y explica por qué.
-Nunca asigna sola: se acepta con «Enviar» o deslizando como siempre. Se apaga en Ajustes → Sugerencias.
-
-Cómo decide (`core/domain/.../suggest`):
+## Sugerencias
 
 | Señal | De dónde sale | Peso |
 |---|---|---|
@@ -83,25 +83,64 @@ Cómo decide (`core/domain/.../suggest`):
 | Nombre de la playlist | Diccionario ES/EN: "gym", "relax", "estudiar"… | 0,15 |
 | Tempo | Deezer (BPM) o el análisis de audio | 0,05 |
 
-- Cada playlist destino tiene un **perfil** aprendido de una muestra de sus canciones, y aprende de
-  cada canción que ordenás ahí.
-- Solo sugiere si una opción gana con claridad (puntaje ≥ 0,5 y 0,1 por encima de la segunda).
-- El análisis de audio (`analysis/audio`) se hace en el teléfono: decodifica la vista previa de
-  30 s y mide volumen, brillo, ataques por segundo y tempo. No se sube nada.
-- Los resultados quedan guardados (tabla `track_features`), así cada canción se analiza una vez.
+Cada destino tiene un perfil aprendido de una muestra de sus canciones y de cada canción que
+ordenás ahí. Solo sugiere si una opción gana con claridad (≥ 0,5 y 0,1 sobre la segunda); nunca
+asigna sola. El audio se analiza en el teléfono (nada se sube), por defecto solo con Wi-Fi, y cada
+canción se analiza una vez (tabla `track_features`).
 
-**Clave de Last.fm (opcional, gratis):** creala en https://www.last.fm/api/account/create y
-guardala como `LASTFM_API_KEY` (en `local.properties`, variable de entorno o secreto de GitHub
-Actions). Sin clave, las sugerencias usan artista, audio, tempo y nombre de la playlist.
+## Arquitectura
 
-## Cómo correrlo
+Kotlin + Jetpack Compose, Hilt, Room, DataStore, WorkManager, Coil, OkHttp. Arquitectura limpia
+multi-módulo: la lógica es Kotlin puro y se testea sin emulador; cada servicio es un módulo que se
+enchufa sin tocar el resto.
 
-Requisitos: JDK 21 y Android SDK (API 37).
-
-```bash
-./gradlew :core:domain:test            # tests de gestos y sesión
-./gradlew :app:testDebugUnitTest       # tests del ViewModel
-./gradlew :app:installDebug            # instala en un dispositivo conectado
+```
+app/                    Arma la app: navegación, DI, tema, reporte de errores
+core/model/             Modelos (Track, Playlist, GestureMap…)                       · Kotlin puro
+core/domain/            Gestos, sesión con deshacer, sugerencias, transferencias,
+                        contrato MusicProvider, cola de escrituras                    · Kotlin puro
+core/oauth/             Login PKCE y renovación de tokens                             · Kotlin puro
+core/testing/           Fakes compartidos para tests                                  · Kotlin puro
+core/data/              Room: cola de escrituras, progreso, análisis de canciones
+core/datastore/         Ajustes
+core/platform/          Login en WebView, tokens cifrados con el Keystore
+core/media/             Reproductor de vistas previas y decodificación de audio
+core/designsystem/      Tema claro/oscuro, íconos, componentes
+analysis/audio/         Análisis de audio (energía, brillo, tempo)                    · Kotlin puro
+preview/deezer/         Vistas previas, BPM y volumen desde Deezer                    · Kotlin puro
+suggest/lastfm/         Etiquetas de estilo de Last.fm                                · Kotlin puro
+feature/source/         Inicio
+feature/swipe/          Pantalla de ordenar, rueda, lista de canciones, sugerencias
+feature/connections/    Conexiones
+feature/settings/       Ajustes y editor de destinos
+feature/transfer/       Transferencias entre servicios
+provider/*-api/         Clientes de Spotify, TIDAL y YouTube                          · Kotlin puro
+provider/*/             Su login y registro en la app (Android)
+provider/fake/          Servicio Demo, sin cuenta
 ```
 
-La CI (GitHub Actions) corre tests, Lint y genera el APK de debug como artefacto descargable.
+**Agregar un servicio**: crear `provider/<nombre>-api` (implementa `MusicProvider` y declara sus
+`ProviderCapabilities`) y `provider/<nombre>` (login + `@IntoSet` en Hilt), e incluirlos en
+`settings.gradle.kts` y `app/build.gradle.kts`. Las pantallas no cambian.
+
+**Textos**: todos en `res/values/strings.xml` de cada módulo (español) con su traducción en
+`values-en`. Para otro idioma, agregar `values-xx` y sumarlo en `app/src/main/res/xml/locales_config.xml`.
+
+## Calidad
+
+En cada cambio, GitHub Actions corre los tests unitarios, Lint, arma el APK y lo recorre en
+emuladores con Android 14 y 16 (`ci/smoke.sh`: bienvenida → demo → ordenar → varias → cada
+pestaña → reabrir), y publica el APK en el pre-release `debug-latest`.
+
+## Publicar (pendiente)
+
+- **Spotify**: pedir *Extended quota* para salir del modo desarrollo (cupo chico de usuarios); desde 2025 se otorga sobre todo a organizaciones.
+- Versión *release*: firma propia, número de versión automático y prueba con R8.
+- Política de privacidad (la piden Google Play y Spotify) y revisar las condiciones de uso de
+  las vistas previas de Deezer y de la API de Last.fm.
+
+## Documentos
+
+- [docs/SERVICIOS.md](docs/SERVICIOS.md): activar TIDAL y YouTube Music.
+- [docs/PROPUESTA.md](docs/PROPUESTA.md) y [docs/ANALISIS.md](docs/ANALISIS.md): propuesta
+  inicial y análisis intermedio (históricos; este README describe el estado actual).
