@@ -1,5 +1,6 @@
 package com.slidedify.feature.swipe
 
+import androidx.compose.ui.res.stringResource
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.animation.animateColorAsState
@@ -134,14 +135,16 @@ data class SwipeActions(
 fun SwipeRoute(onBack: () -> Unit, onOpenSettings: () -> Unit, viewModel: SwipeViewModel = hiltViewModel()) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var notice by remember { mutableStateOf<String?>(null) }
+    val maxDestinations = stringResource(R.string.swipe_max_destinations, GestureMap.MAX_DESTINATIONS)
+    val createFailed = stringResource(R.string.swipe_create_failed)
 
     LaunchedEffect(viewModel) {
         viewModel.events.collect { event ->
             // Successful actions are already visible (card moves, ♥, circle); no toasts or snackbars
             // that would cover the bottom buttons. Only problems get a short notice in the top bar.
             notice = when (event) {
-                SwipeEvent.DestinationsFull -> "Máximo ${GestureMap.MAX_DESTINATIONS} destinos"
-                is SwipeEvent.Error -> event.message
+                SwipeEvent.DestinationsFull -> maxDestinations
+                SwipeEvent.CreatePlaylistFailed -> createFailed
                 else -> null
             } ?: return@collect
             launch {
@@ -212,7 +215,11 @@ fun SwipeScreen(state: SwipeUiState, actions: SwipeActions, notice: String? = nu
                 )
             }
             when {
-                state.loadError != null -> LoadError(state.loadError, actions, Modifier.fillMaxSize())
+                state.loadError != null -> LoadError(
+                    stringResource(R.string.swipe_load_error) + state.loadError.takeIf { it.isNotBlank() }?.let { " ($it)" }.orEmpty(),
+                    actions,
+                    Modifier.fillMaxSize(),
+                )
                 state.isLoading || state.isWaitingForTracks ->
                     Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() }
                 state.isFinished -> FinishedMessage(actions, Modifier.fillMaxSize())
@@ -314,7 +321,7 @@ private fun TopBar(state: SwipeUiState, actions: SwipeActions) {
             .padding(horizontal = 4.dp, vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        IconButton(onClick = actions.onBack) { Icon(AppIcons.Back, contentDescription = "Volver") }
+        IconButton(onClick = actions.onBack) { Icon(AppIcons.Back, contentDescription = stringResource(R.string.swipe_back)) }
         Column(Modifier.weight(1f)) {
             Text(
                 state.sourceName,
@@ -324,17 +331,23 @@ private fun TopBar(state: SwipeUiState, actions: SwipeActions) {
                 overflow = TextOverflow.Ellipsis,
             )
             Row(verticalAlignment = Alignment.CenterVertically) {
-                val progress = if (state.total > 0) " · ${state.sortedCount} de ${state.total}${if (state.isLoadingMore) "+" else ""}" else ""
+                val progress = if (state.total > 0) {
+                    " · " + stringResource(R.string.swipe_progress, state.sortedCount, state.total) + if (state.isLoadingMore) "+" else ""
+                } else {
+                    ""
+                }
+                val moving = if (state.movesFromSource) " · " + stringResource(R.string.swipe_moving) else ""
+                val progressDescription = stringResource(R.string.swipe_progress_a11y, state.sortedCount, state.total)
                 Text(
-                    state.providerName + progress + if (state.movesFromSource) " · moviendo" else "",
+                    state.providerName + progress + moving,
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.semantics { contentDescription = "${state.sortedCount} de ${state.total} canciones revisadas" },
+                    modifier = Modifier.semantics { contentDescription = progressDescription },
                 )
                 if (state.pendingSync > 0) {
                     Icon(
                         AppIcons.Sync,
-                        contentDescription = "${state.pendingSync} cambios pendientes de sincronizar",
+                        contentDescription = stringResource(R.string.swipe_pending_sync, state.pendingSync),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(start = 8.dp).size(14.dp),
                     )
@@ -349,12 +362,12 @@ private fun TopBar(state: SwipeUiState, actions: SwipeActions) {
                 actions.onOpenExternally()
                 runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
             }) {
-                Icon(AppIcons.OpenExternal, contentDescription = "Escuchar completa en ${state.providerName}")
+                Icon(AppIcons.OpenExternal, contentDescription = stringResource(R.string.swipe_open_full, state.providerName))
             }
         }
-        IconButton(onClick = actions.onOpenList, enabled = state.total > 0) { Icon(AppIcons.Queue, contentDescription = "Lista de canciones") }
-        IconButton(onClick = actions.onUndo, enabled = state.canUndo) { Icon(AppIcons.Undo, contentDescription = "Deshacer") }
-        IconButton(onClick = actions.onOpenSettings) { Icon(AppIcons.Tune, contentDescription = "Ajustes") }
+        IconButton(onClick = actions.onOpenList, enabled = state.total > 0) { Icon(AppIcons.Queue, contentDescription = stringResource(R.string.swipe_song_list)) }
+        IconButton(onClick = actions.onUndo, enabled = state.canUndo) { Icon(AppIcons.Undo, contentDescription = stringResource(R.string.swipe_undo)) }
+        IconButton(onClick = actions.onOpenSettings) { Icon(AppIcons.Tune, contentDescription = stringResource(R.string.swipe_settings)) }
     }
 }
 
@@ -451,7 +464,11 @@ private fun GestureArea(
         ) {
             val drag = gesture as? GestureState.Dragging
             val splitGrey = drag?.hadSelection == true
-            val zones = remember(state.targets, layout, splitGrey) { swipeZones(state.targets, layout, withCancel = splitGrey) }
+            val skipLabel = stringResource(R.string.swipe_skip)
+            val cancelLabel = stringResource(R.string.swipe_cancel)
+            val zones = remember(state.targets, layout, splitGrey, skipLabel) {
+                swipeZones(state.targets, layout, withCancel = splitGrey, skipLabel = skipLabel, cancelLabel = cancelLabel)
+            }
             // Before reaching a zone, preview where the drag is heading.
             val hoveredZone = drag?.let { d ->
                 d.hovered?.let { if (!splitGrey && it == Sector.Cancel) Sector.Skip else it }
@@ -502,7 +519,7 @@ private fun GestureArea(
 
             if (gesture == GestureState.Idle && state.tutorialStep == null) {
                 Text(
-                    if (state.targets.isEmpty()) "Agregá una playlist con + para empezar" else "Deslizá por varias zonas sin soltar, o mantené para la rueda",
+                    stringResource(if (state.targets.isEmpty()) R.string.swipe_hint_empty else R.string.swipe_hint),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier
@@ -541,19 +558,20 @@ private fun TrackCard(
 ) {
     // Every gesture is also reachable from TalkBack's actions menu.
     val a11yActions = buildList {
-        add(CustomAccessibilityAction("Omitir") { actions.onSkip(); true })
+        add(CustomAccessibilityAction(stringResource(R.string.swipe_skip)) { actions.onSkip(); true })
         state.targets.forEach { target ->
-            add(CustomAccessibilityAction("Agregar a ${target.label}") { actions.onSwipe(target.slot); true })
+            add(CustomAccessibilityAction(stringResource(R.string.swipe_add_to, target.label)) { actions.onSwipe(target.slot); true })
         }
         if (state.canLike) {
-            add(CustomAccessibilityAction(if (state.isLiked) "Quitar de Me gusta" else "Me gusta") { actions.onDoubleTap(); true })
+            add(CustomAccessibilityAction(stringResource(if (state.isLiked) R.string.swipe_unlike else R.string.swipe_like)) { actions.onDoubleTap(); true })
         }
-        add(CustomAccessibilityAction(if (state.player.isPlaying) "Pausar" else "Reproducir") { actions.onTogglePlayback(); true })
+        add(CustomAccessibilityAction(stringResource(if (state.player.isPlaying) R.string.swipe_pause else R.string.swipe_play)) { actions.onTogglePlayback(); true })
     }
+    val cardDescription = stringResource(R.string.swipe_card_a11y, track.title, track.artistNames, track.album.name)
     Card(
         modifier = modifier
             .semantics(mergeDescendants = true) {
-                contentDescription = "${track.title}, de ${track.artistNames}, álbum ${track.album.name}"
+                contentDescription = cardDescription
                 customActions = a11yActions
             },
         shape = RoundedCornerShape(CardCorner),
@@ -617,7 +635,7 @@ private fun TrackCard(
             if (state.canLike) {
                 Icon(
                     if (state.isLiked) AppIcons.Heart else AppIcons.HeartOutline,
-                    contentDescription = if (state.isLiked) "En Me gusta" else "No está en Me gusta",
+                    contentDescription = stringResource(if (state.isLiked) R.string.swipe_liked else R.string.swipe_not_liked),
                     tint = if (state.isLiked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(28.dp),
                 )
@@ -638,13 +656,10 @@ private fun placeholderBrush(track: Track): Brush {
 @Composable
 private fun TutorialCard(step: TutorialStep, canLike: Boolean, onSkip: () -> Unit, modifier: Modifier = Modifier) {
     val (title, body) = when (step) {
-        TutorialStep.Swipe -> "1/3 · Deslizá" to
-            "Deslizá hacia el color de una playlist para agregarla, o hacia la zona gris para omitir. " +
-            "+ Playlist (abajo a la derecha) suma destinos. Deshacé con ↶."
-        TutorialStep.Wheel -> "2/3 · Mantené presionado" to
-            "Aparece la rueda. Empujá el pulgar hacia una playlist y volvé al centro para marcar varias. Soltá para confirmar. A la izquierda: Omitir (arriba) y Cancelar (abajo)."
-        TutorialStep.DoubleTap -> "3/3 · Doble toque" to
-            if (canLike) "Tocá dos veces para agregar a Me gusta. Un toque pausa o reanuda." else "Un toque pausa o reanuda la canción."
+        TutorialStep.Swipe -> stringResource(R.string.tutorial_swipe_title) to stringResource(R.string.tutorial_swipe_text)
+        TutorialStep.Wheel -> stringResource(R.string.tutorial_wheel_title) to stringResource(R.string.tutorial_wheel_text)
+        TutorialStep.DoubleTap -> stringResource(R.string.tutorial_tap_title) to
+            stringResource(if (canLike) R.string.tutorial_tap_like else R.string.tutorial_tap_no_like)
     }
     Surface(
         modifier = modifier.padding(horizontal = 16.dp, vertical = 8.dp),
@@ -657,7 +672,7 @@ private fun TutorialCard(step: TutorialStep, canLike: Boolean, onSkip: () -> Uni
             Text(title, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(4.dp))
             Text(body, style = MaterialTheme.typography.bodyMedium)
-            TextButton(onClick = onSkip, modifier = Modifier.align(Alignment.End)) { Text("Saltar tutorial", color = Color.Black) }
+            TextButton(onClick = onSkip, modifier = Modifier.align(Alignment.End)) { Text(stringResource(R.string.tutorial_skip), color = Color.Black) }
         }
     }
 }
@@ -687,22 +702,22 @@ private fun BottomBar(state: SwipeUiState, actions: SwipeActions, onAddDestinati
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceEvenly,
         ) {
-            RoundAction(AppIcons.Skip, "Omitir", actions.onSkip, Modifier.weight(1f))
-            RoundAction(AppIcons.MultiSelect, "Varias", onMultiSend, Modifier.weight(1f))
+            RoundAction(AppIcons.Skip, stringResource(R.string.swipe_skip), actions.onSkip, Modifier.weight(1f))
+            RoundAction(AppIcons.MultiSelect, stringResource(R.string.swipe_several), onMultiSend, Modifier.weight(1f))
             FilledIconButton(
                 onClick = actions.onTogglePlayback,
                 modifier = Modifier.size(68.dp),
             ) {
                 Icon(
                     if (player.isPlaying) AppIcons.Pause else AppIcons.Play,
-                    contentDescription = if (player.isPlaying) "Pausar" else "Reproducir",
+                    contentDescription = stringResource(if (player.isPlaying) R.string.swipe_pause else R.string.swipe_play),
                     modifier = Modifier.size(34.dp),
                 )
             }
             if (state.canLike) {
-                RoundAction(if (state.isLiked) AppIcons.Heart else AppIcons.HeartOutline, "Me gusta", actions.onDoubleTap, Modifier.weight(1f))
+                RoundAction(if (state.isLiked) AppIcons.Heart else AppIcons.HeartOutline, stringResource(R.string.swipe_like), actions.onDoubleTap, Modifier.weight(1f))
             }
-            RoundAction(AppIcons.Add, "Playlist", onAddDestination, Modifier.weight(1f))
+            RoundAction(AppIcons.Add, stringResource(R.string.swipe_playlist), onAddDestination, Modifier.weight(1f))
         }
     }
 }
@@ -757,15 +772,15 @@ private fun AddDestinationSheet(
                 .padding(horizontal = 24.dp)
                 .padding(bottom = 24.dp),
         ) {
-            Text("Agregar destino", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Text(stringResource(R.string.add_destination_title), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
             Text(
-                "El círculo se reparte en partes iguales entre las playlists y la zona de omitir.",
+                stringResource(R.string.add_destination_help),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(Modifier.height(12.dp))
             if (!state.canAddDestination) {
-                Text("Ya tenés ${GestureMap.MAX_DESTINATIONS} destinos (el máximo). Podés armar combos desde Ajustes.")
+                Text(stringResource(R.string.add_destination_full, GestureMap.MAX_DESTINATIONS))
                 return@Column
             }
             if (state.canCreatePlaylists) {
@@ -773,11 +788,11 @@ private fun AddDestinationSheet(
                     OutlinedTextField(
                         value = newName,
                         onValueChange = { newName = it },
-                        label = { Text("Nueva playlist") },
+                        label = { Text(stringResource(R.string.add_destination_new)) },
                         singleLine = true,
                         modifier = Modifier.weight(1f),
                     )
-                    TextButton(onClick = { onCreate(newName) }, enabled = newName.isNotBlank()) { Text("Crear") }
+                    TextButton(onClick = { onCreate(newName) }, enabled = newName.isNotBlank()) { Text(stringResource(R.string.add_destination_create)) }
                 }
                 Spacer(Modifier.height(8.dp))
             }
@@ -802,20 +817,20 @@ private fun LoadError(message: String, actions: SwipeActions, modifier: Modifier
     Column(modifier.padding(24.dp), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
         Text(message, color = MaterialTheme.colorScheme.error)
         Spacer(Modifier.height(16.dp))
-        Button(onClick = actions.onRetry) { Text("Reintentar") }
-        TextButton(onClick = actions.onBack) { Text("Volver") }
+        Button(onClick = actions.onRetry) { Text(stringResource(R.string.swipe_retry)) }
+        TextButton(onClick = actions.onBack) { Text(stringResource(R.string.swipe_back)) }
     }
 }
 
 @Composable
 private fun FinishedMessage(actions: SwipeActions, modifier: Modifier = Modifier) {
     Column(modifier, verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
-        Text("¡Listo!", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+        Text(stringResource(R.string.swipe_done_title), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(8.dp))
-        Text("Ordenaste todas las canciones.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(stringResource(R.string.swipe_done_text), color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(16.dp))
-        Button(onClick = actions.onBack) { Text("Elegir otra fuente") }
-        TextButton(onClick = actions.onRestart) { Text("Empezar de nuevo esta lista") }
+        Button(onClick = actions.onBack) { Text(stringResource(R.string.swipe_done_other)) }
+        TextButton(onClick = actions.onRestart) { Text(stringResource(R.string.swipe_done_restart)) }
     }
 }
 

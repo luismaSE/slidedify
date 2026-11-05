@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="source_liked">Me gusta</string>
+    <string name="source_top">Lo que más escuchás</string>
+    <string name="home_your_playlists">Tus playlists</string>
+    <string name="home_your_playlists_count">Tus playlists · %1$d</string>
+    <string name="home_recent">Recientes</string>
+    <string name="home_shortcuts">Accesos rápidos</string>
+    <string name="home_no_playlists">Todavía no tenés playlists</string>
+    <string name="home_no_playlists_hint">Creá una desde la pantalla de ordenar con el botón «Playlist».</string>
+    <string name="home_no_results">Sin resultados</string>
+    <string name="home_no_results_hint">No hay playlists que coincidan con «%1$s».</string>
+    <string name="home_service_switcher">Servicio: %1$s. Tocá para cambiar</string>
+    <string name="home_active">Activo</string>
+    <string name="home_manage_connections">Administrar conexiones</string>
+    <string name="home_hello">Hola</string>
+    <string name="home_hello_name">Hola, %1$s</string>
+    <string name="home_what_today">¿Qué ordenamos hoy?</string>
+    <string name="home_continue_title">SEGUÍ DONDE QUEDASTE</string>
+    <string name="home_done_title">TERMINASTE</string>
+    <string name="home_continue">Continuar</string>
+    <string name="home_review_again">Revisar de nuevo</string>
+    <string name="home_start">Empezar</string>
+    <string name="home_tag_last">Última</string>
+    <string name="home_tag_followed">Seguida</string>
+    <string name="home_playlist">Playlist</string>
+    <string name="home_finished">Terminada</string>
+    <string name="home_search">Buscar playlist</string>
+    <string name="home_clear_search">Borrar búsqueda</string>
+    <string name="home_retry">Reintentar</string>
+    <string name="home_load_error">No se pudieron cargar tus playlists</string>
+    <string name="home_welcome">Bienvenido a Compass</string>
+    <string name="home_welcome_text">Ordená tu música deslizando: cada canción va a la playlist que elijas con un gesto.</string>
+    <string name="home_step1">Conectá tu cuenta</string>
+    <string name="home_step1_detail">Spotify u otro servicio compatible.</string>
+    <string name="home_step2">Elegí qué ordenar</string>
+    <string name="home_step2_detail">Tus Me gusta o cualquier playlist.</string>
+    <string name="home_step3">Deslizá</string>
+    <string name="home_step3_detail">Hacia una playlist, o por varias sin soltar.</string>
+    <string name="home_connect_with">Conectar con %1$s</string>
+    <string name="home_see_services">Ver servicios disponibles</string>
+    <string name="home_try_demo">Probar sin cuenta (demo)</string>
+    <string name="progress_complete">Completa</string>
+    <string name="progress_percent">%1$d%% ordenado</string>
+    <string name="progress_of">%1$d de %2$d</string>
+    <string name="progress_not_started">Sin empezar</string>
+    <plurals name="progress_reviewed">
+        <item quantity="one">%1$d revisada</item>
+        <item quantity="other">%1$d revisadas</item>
+    </plurals>
+    <plurals name="songs_count">
+        <item quantity="one">%1$d canción</item>
+        <item quantity="other">%1$d canciones</item>
+    </plurals>
+    <string name="time_just_now">recién</string>
+    <string name="time_minutes">hace %1$d min</string>
+    <string name="time_hours">hace %1$d h</string>
+    <string name="time_yesterday">ayer</string>
+    <plurals name="time_days">
+        <item quantity="one">hace %1$d día</item>
+        <item quantity="other">hace %1$d días</item>
+    </plurals>
+</resources>

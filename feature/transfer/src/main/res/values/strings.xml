@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="transfer_title">Transferir</string>
+    <string name="transfer_back">Volver</string>
+    <string name="transfer_empty_title">Mové tu música entre servicios</string>
+    <string name="transfer_empty_text">Conectá al menos dos servicios para copiar, mover o sincronizar playlists entre ellos.</string>
+    <string name="transfer_go_connections">Ir a Conexiones</string>
+    <string name="transfer_from">1. Desde</string>
+    <string name="transfer_to">2. Hacia</string>
+    <string name="transfer_how">3. Cómo</string>
+    <string name="transfer_liked">Me gusta</string>
+    <string name="transfer_unavailable">%1$s (no disponible)</string>
+    <string name="transfer_new_playlist">Nueva playlist</string>
+    <string name="transfer_name">Nombre</string>
+    <string name="transfer_copy">Copiar</string>
+    <string name="transfer_copy_detail">Agrega las canciones al destino; el origen no cambia.</string>
+    <string name="transfer_move">Mover</string>
+    <string name="transfer_move_detail">Copia y después saca del origen las canciones que encontró.</string>
+    <string name="transfer_sync">Sincronizar</string>
+    <string name="transfer_sync_detail">Las dos playlists quedan con todas las canciones. Requiere una playlist existente.</string>
+    <string name="transfer_read_error">No se pudieron leer las playlists de %1$s</string>
+    <string name="transfer_start">Empezar</string>
+    <string name="transfer_reading">Leyendo %1$s…</string>
+    <string name="transfer_matching">Buscando canciones: %1$d de %2$d</string>
+    <string name="transfer_writing">Guardando cambios…</string>
+    <string name="transfer_failed">No se pudo completar la transferencia</string>
+    <string name="transfer_retry">Volver a intentar</string>
+    <string name="transfer_done">Listo: «%1$s»</string>
+    <string name="transfer_summary">%1$d agregadas · %2$d ya estaban · %3$d no encontradas</string>
+    <string name="transfer_removed">%1$d quitadas del origen</string>
+    <string name="transfer_added_back">%1$d agregadas al origen</string>
+    <string name="transfer_background">Los cambios se envían en segundo plano (⟳ en la pantalla de ordenar).</string>
+    <string name="transfer_not_found">No encontradas</string>
+    <string name="transfer_again">Hacer otra</string>
+</resources>

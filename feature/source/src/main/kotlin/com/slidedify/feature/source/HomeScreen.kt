@@ -50,6 +50,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -84,7 +86,7 @@ fun HomeRoute(
     val context = LocalContext.current
     HomeScreen(
         state = state,
-        onOpenSource = { onOpenSource(it.source, it.title) },
+        onOpenSource = onOpenSource,
         onSelectProvider = viewModel::selectProvider,
         onSignIn = { viewModel.signIn(context) },
         onRetry = viewModel::retry,
@@ -95,7 +97,7 @@ fun HomeRoute(
 @Composable
 fun HomeScreen(
     state: HomeUiState,
-    onOpenSource: (SourceCard) -> Unit,
+    onOpenSource: (TrackSource, String) -> Unit,
     onSelectProvider: (ProviderId) -> Unit,
     onSignIn: () -> Unit,
     onRetry: () -> Unit,
@@ -125,40 +127,56 @@ fun HomeScreen(
         item(key = "greeting") { Greeting(state.userName) }
 
         state.continueCard?.let { card ->
-            item(key = "continue") { ContinueCard(card, onClick = { onOpenSource(card) }) }
+            item(key = "continue") {
+                val name = card.name()
+                ContinueCard(card, onClick = { onOpenSource(card.source, name) })
+            }
         }
 
         if (state.recent.isNotEmpty()) {
-            item(key = "recent-title") { SectionHeader("Recientes") }
+            item(key = "recent-title") { SectionHeader(stringResource(R.string.home_recent)) }
             item(key = "recent") {
                 LazyRow(
                     contentPadding = PaddingValues(horizontal = 20.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    items(state.recent, key = { it.source.key }) { card -> RecentTile(card) { onOpenSource(card) } }
+                    items(state.recent, key = { it.source.key }) { card ->
+                        val name = card.name()
+                        RecentTile(card) { onOpenSource(card.source, name) }
+                    }
                 }
             }
         }
 
         if (state.shortcuts.isNotEmpty()) {
-            item(key = "shortcuts-title") { SectionHeader("Accesos rápidos") }
+            item(key = "shortcuts-title") { SectionHeader(stringResource(R.string.home_shortcuts)) }
             item(key = "shortcuts") {
                 Row(
                     Modifier.padding(horizontal = 20.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     state.shortcuts.forEach { card ->
-                        ShortcutTile(card, Modifier.weight(1f)) { onOpenSource(card) }
+                        val name = card.name()
+                        ShortcutTile(card, Modifier.weight(1f)) { onOpenSource(card.source, name) }
                     }
                 }
             }
         }
 
         item(key = "playlists-title") {
-            SectionHeader(if (state.playlists.isEmpty()) "Tus playlists" else "Tus playlists · ${state.playlists.size}")
+            SectionHeader(
+                if (state.playlists.isEmpty()) {
+                    stringResource(R.string.home_your_playlists)
+                } else {
+                    stringResource(R.string.home_your_playlists_count, state.playlists.size)
+                },
+            )
         }
-        state.error?.let { error ->
-            item(key = "error") { ErrorRow(error, onRetry) }
+        if (state.loadFailed) {
+            item(key = "error") {
+                val message = stringResource(R.string.home_load_error) + state.errorDetail?.let { " ($it)" }.orEmpty()
+                ErrorRow(message, onRetry)
+            }
         }
         if (state.isLoading) {
             items(5, key = { "skeleton-$it" }) { PlaylistSkeleton() }
@@ -167,22 +185,22 @@ fun HomeScreen(
                 item(key = "search") { SearchField(query) { query = it } }
             }
             val visible = if (query.isBlank()) state.playlists else state.playlists.filter { it.title.contains(query.trim(), ignoreCase = true) }
-            if (visible.isEmpty() && state.error == null) {
+            if (visible.isEmpty() && !state.loadFailed) {
                 item(key = "empty") {
                     EmptyState(
                         icon = if (query.isBlank()) AppIcons.Library else AppIcons.Search,
-                        title = if (query.isBlank()) "Todavía no tenés playlists" else "Sin resultados",
+                        title = stringResource(if (query.isBlank()) R.string.home_no_playlists else R.string.home_no_results),
                         message = if (query.isBlank()) {
-                            "Creá una desde la pantalla de ordenar con el botón «Playlist»."
+                            stringResource(R.string.home_no_playlists_hint)
                         } else {
-                            "No hay playlists que coincidan con «${query.trim()}»."
+                            stringResource(R.string.home_no_results_hint, query.trim())
                         },
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
             }
             items(visible, key = { it.source.key }) { card ->
-                PlaylistRow(card, isLast = card.source.key == lastKey) { onOpenSource(card) }
+                PlaylistRow(card, isLast = card.source.key == lastKey) { onOpenSource(card.source, card.title) }
             }
         }
     }
@@ -221,12 +239,13 @@ private fun ProviderSwitcher(
     onOpenConnections: () -> Unit,
 ) {
     var open by remember { mutableStateOf(false) }
+    val description = stringResource(R.string.home_service_switcher, active.name)
     Box {
         Surface(
             onClick = { open = true },
             shape = CircleShape,
             color = MaterialTheme.colorScheme.surfaceContainerHigh,
-            modifier = Modifier.semantics { contentDescription = "Servicio: ${active.name}. Tocá para cambiar" },
+            modifier = Modifier.semantics { contentDescription = description },
         ) {
             Row(Modifier.padding(start = 6.dp, end = 12.dp, top = 6.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                 ProviderBadge(active.id.value, active.name, size = 24.dp)
@@ -239,7 +258,7 @@ private fun ProviderSwitcher(
                     text = { Text(provider.name) },
                     leadingIcon = { ProviderBadge(provider.id.value, provider.name, size = 24.dp) },
                     trailingIcon = {
-                        if (provider.id == active.id) Icon(AppIcons.Check, contentDescription = "Activo", tint = MaterialTheme.colorScheme.primary)
+                        if (provider.id == active.id) Icon(AppIcons.Check, contentDescription = stringResource(R.string.home_active), tint = MaterialTheme.colorScheme.primary)
                     },
                     onClick = {
                         open = false
@@ -248,7 +267,7 @@ private fun ProviderSwitcher(
                 )
             }
             DropdownMenuItem(
-                text = { Text("Administrar conexiones") },
+                text = { Text(stringResource(R.string.home_manage_connections)) },
                 leadingIcon = { Icon(AppIcons.Link, contentDescription = null) },
                 onClick = {
                     open = false
@@ -264,11 +283,11 @@ private fun Greeting(userName: String?) {
     val first = userName?.trim()?.substringBefore(' ')?.takeIf { it.isNotBlank() && it != "demo" }
     Column(Modifier.padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 4.dp)) {
         Text(
-            if (first != null) "Hola, $first" else "Hola",
+            if (first != null) stringResource(R.string.home_hello_name, first) else stringResource(R.string.home_hello),
             style = MaterialTheme.typography.headlineMedium,
         )
         Text(
-            "¿Qué ordenamos hoy?",
+            stringResource(R.string.home_what_today),
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -294,20 +313,20 @@ private fun ContinueCard(card: SourceCard, onClick: () -> Unit) {
         ) {
             Column(Modifier.padding(18.dp)) {
                 Text(
-                    if (card.isDone) "TERMINASTE" else "SEGUÍ DONDE QUEDASTE",
+                    stringResource(if (card.isDone) R.string.home_done_title else R.string.home_continue_title),
                     style = OverlineStyle,
                     color = MaterialTheme.colorScheme.primary,
                 )
                 Row(Modifier.padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    CoverArt(card.imageUrl, card.title, size = 76.dp, corner = 14.dp, icon = card.source.icon())
+                    CoverArt(card.imageUrl, card.name(), size = 76.dp, corner = 14.dp, icon = card.source.icon())
                     Column(
                         Modifier
                             .padding(start = 14.dp)
                             .weight(1f),
                     ) {
-                        Text(card.title, style = MaterialTheme.typography.titleLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        Text(card.name(), style = MaterialTheme.typography.titleLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
                         Text(
-                            listOfNotNull(card.progressLabel(), card.openedAt?.let(::relativeTime)).joinToString(" · "),
+                            listOfNotNull(card.progressLabel(), card.openedAt?.let { relativeTime(it) }).joinToString(" · "),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(top = 2.dp),
@@ -326,7 +345,7 @@ private fun ContinueCard(card: SourceCard, onClick: () -> Unit) {
                 ) {
                     Icon(AppIcons.Play, contentDescription = null, modifier = Modifier.size(20.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text(if (card.isDone) "Revisar de nuevo" else "Continuar")
+                    Text(stringResource(if (card.isDone) R.string.home_review_again else R.string.home_continue))
                 }
             }
         }
@@ -342,9 +361,9 @@ private fun RecentTile(card: SourceCard, onClick: () -> Unit) {
             .clickable(role = Role.Button, onClick = onClick)
             .padding(bottom = 4.dp),
     ) {
-        CoverArt(card.imageUrl, card.title, size = 116.dp, corner = 16.dp, icon = card.source.icon())
+        CoverArt(card.imageUrl, card.name(), size = 116.dp, corner = 16.dp, icon = card.source.icon())
         Text(
-            card.title,
+            card.name(),
             style = MaterialTheme.typography.labelLarge,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -364,11 +383,11 @@ private fun ShortcutTile(card: SourceCard, modifier: Modifier = Modifier, onClic
         modifier = modifier,
     ) {
         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            CoverArt(null, card.title, size = 40.dp, corner = 10.dp, icon = card.source.icon())
+            CoverArt(null, card.name(), size = 40.dp, corner = 10.dp, icon = card.source.icon())
             Column(Modifier.padding(start = 10.dp)) {
-                Text(card.title, style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(card.name(), style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(
-                    card.progressLabel() ?: "Empezar",
+                    card.progressLabel() ?: stringResource(R.string.home_start),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
@@ -405,11 +424,14 @@ private fun PlaylistRow(card: SourceCard, isLast: Boolean, onClick: () -> Unit) 
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f, fill = false),
                     )
-                    if (isLast) Tag("Última", Modifier.padding(start = 8.dp))
-                    if (card.followed) Tag("Seguida", Modifier.padding(start = 8.dp), color = MaterialTheme.colorScheme.secondary)
+                    if (isLast) Tag(stringResource(R.string.home_tag_last), Modifier.padding(start = 8.dp))
+                    if (card.followed) Tag(stringResource(R.string.home_tag_followed), Modifier.padding(start = 8.dp), color = MaterialTheme.colorScheme.secondary)
                 }
                 Text(
-                    listOfNotNull(card.total?.let { "$it canciones" }, card.progressLabel(short = true)).joinToString(" · ").ifEmpty { "Playlist" },
+                    listOfNotNull(
+                        card.total?.let { pluralStringResource(R.plurals.songs_count, it, it) },
+                        card.progressLabel(short = true),
+                    ).joinToString(" · ").ifEmpty { stringResource(R.string.home_playlist) },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
@@ -420,7 +442,7 @@ private fun PlaylistRow(card: SourceCard, isLast: Boolean, onClick: () -> Unit) 
                 }
             }
             if (card.isDone) {
-                Icon(AppIcons.Check, contentDescription = "Terminada", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(start = 8.dp))
+                Icon(AppIcons.Check, contentDescription = stringResource(R.string.home_finished), tint = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(start = 8.dp))
             } else {
                 Icon(AppIcons.Chevron, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 8.dp))
             }
@@ -445,13 +467,13 @@ private fun SearchField(query: String, onChange: (String) -> Unit) {
         value = query,
         onValueChange = onChange,
         singleLine = true,
-        placeholder = { Text("Buscar playlist") },
+        placeholder = { Text(stringResource(R.string.home_search)) },
         leadingIcon = { Icon(AppIcons.Search, contentDescription = null) },
         trailingIcon = {
             if (query.isNotEmpty()) {
                 Icon(
                     AppIcons.Close,
-                    contentDescription = "Borrar búsqueda",
+                    contentDescription = stringResource(R.string.home_clear_search),
                     modifier = Modifier.clickable(role = Role.Button) { onChange("") },
                 )
             }
@@ -479,7 +501,7 @@ private fun ErrorRow(message: String, onRetry: () -> Unit) {
     ) {
         Row(Modifier.padding(start = 16.dp, end = 4.dp, top = 4.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(message, color = MaterialTheme.colorScheme.onErrorContainer, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-            TextButton(onClick = onRetry) { Text("Reintentar") }
+            TextButton(onClick = onRetry) { Text(stringResource(R.string.home_retry)) }
         }
     }
 }
@@ -501,21 +523,21 @@ private fun Welcome(
     ) {
         CompassMark(size = 112.dp)
         Text(
-            "Bienvenido a Compass",
+            stringResource(R.string.home_welcome),
             style = MaterialTheme.typography.headlineMedium,
             modifier = Modifier.padding(top = 24.dp),
         )
         Text(
-            "Ordená tu música deslizando: cada canción va a la playlist que elijas con un gesto.",
+            stringResource(R.string.home_welcome_text),
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 8.dp),
         )
 
         Column(Modifier.padding(top = 28.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            Step(1, "Conectá tu cuenta", "Spotify u otro servicio compatible.")
-            Step(2, "Elegí qué ordenar", "Tus Me gusta o cualquier playlist.")
-            Step(3, "Deslizá", "Hacia una playlist, o mantené apretado para elegir varias.")
+            Step(1, stringResource(R.string.home_step1), stringResource(R.string.home_step1_detail))
+            Step(2, stringResource(R.string.home_step2), stringResource(R.string.home_step2_detail))
+            Step(3, stringResource(R.string.home_step3), stringResource(R.string.home_step3_detail))
         }
 
         (state.auth as? AuthState.Error)?.let { error ->
@@ -534,7 +556,7 @@ private fun Welcome(
                     .fillMaxWidth()
                     .padding(top = 28.dp)
                     .height(52.dp),
-            ) { Text("Conectar con $providerName") }
+            ) { Text(stringResource(R.string.home_connect_with, providerName)) }
         }
         OutlinedButton(
             onClick = onOpenConnections,
@@ -542,10 +564,10 @@ private fun Welcome(
                 .fillMaxWidth()
                 .padding(top = 10.dp)
                 .height(52.dp),
-        ) { Text("Ver servicios disponibles") }
+        ) { Text(stringResource(R.string.home_see_services)) }
         state.demo?.takeIf { it.id != state.provider?.id }?.let { demo ->
             TextButton(onClick = { onSelectProvider(demo.id) }, modifier = Modifier.padding(top = 4.dp)) {
-                Text("Probar sin cuenta (demo)")
+                Text(stringResource(R.string.home_try_demo))
             }
         }
     }
@@ -576,21 +598,35 @@ private fun TrackSource.icon() = when (this) {
     is TrackSource.FromPlaylist -> null
 }
 
+/** Liked songs and top tracks are named here, in the user's language; playlists keep their name. */
+@Composable
+private fun SourceCard.name(): String = when (source) {
+    TrackSource.LikedSongs -> stringResource(R.string.source_liked)
+    TrackSource.Recommended -> stringResource(R.string.source_top)
+    is TrackSource.FromPlaylist -> title
+}
+
+@Composable
 private fun SourceCard.progressLabel(short: Boolean = false): String? = when {
-    isDone -> "Completa"
-    total != null && sorted > 0 -> if (short) "${((progress ?: 0f) * 100).toInt()}% ordenado" else "$sorted de $total"
-    sorted > 0 -> "$sorted revisadas"
-    else -> if (short) null else "Sin empezar"
+    isDone -> stringResource(R.string.progress_complete)
+    total != null && sorted > 0 -> if (short) {
+        stringResource(R.string.progress_percent, ((progress ?: 0f) * 100).toInt())
+    } else {
+        stringResource(R.string.progress_of, sorted, total)
+    }
+    sorted > 0 -> pluralStringResource(R.plurals.progress_reviewed, sorted, sorted)
+    else -> if (short) null else stringResource(R.string.progress_not_started)
 }
 
 /** "hace 5 min", "ayer"… */
+@Composable
 private fun relativeTime(at: Long, now: Long = System.currentTimeMillis()): String {
     val minutes = ((now - at) / 60_000).coerceAtLeast(0)
     return when {
-        minutes < 1 -> "recién"
-        minutes < 60 -> "hace $minutes min"
-        minutes < 24 * 60 -> "hace ${minutes / 60} h"
-        minutes < 48 * 60 -> "ayer"
-        else -> "hace ${minutes / (24 * 60)} días"
+        minutes < 1 -> stringResource(R.string.time_just_now)
+        minutes < 60 -> stringResource(R.string.time_minutes, minutes.toInt())
+        minutes < 24 * 60 -> stringResource(R.string.time_hours, (minutes / 60).toInt())
+        minutes < 48 * 60 -> stringResource(R.string.time_yesterday)
+        else -> (minutes / (24 * 60)).toInt().let { pluralStringResource(R.plurals.time_days, it, it) }
     }
 }

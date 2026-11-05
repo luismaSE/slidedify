@@ -32,6 +32,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -77,7 +78,8 @@ data class TransferUiState(
     val newName: String = "",
     val mode: TransferMode = TransferMode.Copy,
     val progress: TransferProgress? = null,
-    val error: String? = null,
+    /** Name of the service whose playlists couldn't be read, if that happened. */
+    val readErrorService: String? = null,
 ) {
     val running: Boolean get() = progress != null && progress !is TransferProgress.Done && progress !is TransferProgress.Failed
     val canStart: Boolean
@@ -106,26 +108,29 @@ class TransferViewModel @Inject constructor(
     }
 
     fun selectFrom(id: ProviderId) {
-        _state.update { it.copy(from = id, sources = emptyList(), source = null, error = null) }
+        _state.update { it.copy(from = id, sources = emptyList(), source = null, readErrorService = null) }
         val provider = registry.find(id) ?: return
         viewModelScope.launch {
             val choices = try {
-                listOf(SourceChoice(TrackSource.LikedSongs, "Me gusta")) +
+                // Liked songs get their (translated) name from the screen.
+                listOf(SourceChoice(TrackSource.LikedSongs, "")) +
                     provider.playlists.allPlaylists().map { SourceChoice(TrackSource.FromPlaylist(it.id), it.name) }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                _state.update { it.copy(error = "No se pudieron leer las playlists de ${provider.displayName}") }
+                _state.update { it.copy(readErrorService = provider.displayName) }
                 return@launch
             }
             _state.update { it.copy(sources = choices) }
         }
     }
 
-    fun selectSource(choice: SourceChoice) = _state.update { it.copy(source = choice, newName = it.newName.ifBlank { choice.name }) }
+    /** [displayName]: how the screen shows it (liked songs are named there). */
+    fun selectSource(choice: SourceChoice, displayName: String = choice.name) =
+        _state.update { it.copy(source = choice, newName = it.newName.ifBlank { displayName }) }
 
     fun selectTo(id: ProviderId) {
-        _state.update { it.copy(to = id, targetPlaylists = emptyList(), existingTarget = null, error = null) }
+        _state.update { it.copy(to = id, targetPlaylists = emptyList(), existingTarget = null, readErrorService = null) }
         val provider = registry.find(id) ?: return
         viewModelScope.launch {
             val playlists = try {
@@ -187,9 +192,9 @@ private fun TransferScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Transferir") },
+                title = { Text(stringResource(R.string.transfer_title)) },
                 navigationIcon = {
-                    if (onBack != null) IconButton(onClick = onBack) { Icon(AppIcons.Back, contentDescription = "Volver") }
+                    if (onBack != null) IconButton(onClick = onBack) { Icon(AppIcons.Back, contentDescription = stringResource(R.string.transfer_back)) }
                 },
             )
         },
@@ -199,9 +204,9 @@ private fun TransferScreen(
             Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
                 EmptyState(
                     icon = AppIcons.Swap,
-                    title = "Mové tu música entre servicios",
-                    message = "Conectá al menos dos servicios para copiar, mover o sincronizar playlists entre ellos.",
-                    actionLabel = "Ir a Conexiones",
+                    title = stringResource(R.string.transfer_empty_title),
+                    message = stringResource(R.string.transfer_empty_text),
+                    actionLabel = stringResource(R.string.transfer_go_connections),
                     onAction = onOpenConnections,
                 )
             }
@@ -212,7 +217,7 @@ private fun TransferScreen(
             return@Scaffold
         }
         LazyColumn(Modifier.fillMaxSize().padding(padding), contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 24.dp)) {
-            item { Section("1. Desde") }
+            item { Section(stringResource(R.string.transfer_from)) }
             item {
                 FlowRow(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     state.services.forEach { s ->
@@ -221,10 +226,11 @@ private fun TransferScreen(
                 }
             }
             items(state.sources, key = { it.source.toString() }) { choice ->
-                RadioRow(choice.name, selected = choice == state.source) { vm.selectSource(choice) }
+                val name = if (choice.source == TrackSource.LikedSongs) stringResource(R.string.transfer_liked) else choice.name
+                RadioRow(name, selected = choice == state.source) { vm.selectSource(choice, name) }
             }
 
-            item { Section("2. Hacia") }
+            item { Section(stringResource(R.string.transfer_to)) }
             item {
                 FlowRow(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     state.services.filter { it.id != state.from }.forEach { s ->
@@ -232,18 +238,18 @@ private fun TransferScreen(
                             selected = s.id == state.to,
                             enabled = s.canSearch,
                             onClick = { vm.selectTo(s.id) },
-                            label = { Text(if (s.canSearch) s.name else "${s.name} (no disponible)") },
+                            label = { Text(if (s.canSearch) s.name else stringResource(R.string.transfer_unavailable, s.name)) },
                         )
                     }
                 }
             }
-            item { RadioRow("Nueva playlist", selected = state.existingTarget == null) { vm.selectExisting(null) } }
+            item { RadioRow(stringResource(R.string.transfer_new_playlist), selected = state.existingTarget == null) { vm.selectExisting(null) } }
             if (state.existingTarget == null) {
                 item {
                     OutlinedTextField(
                         value = state.newName,
                         onValueChange = vm::setNewName,
-                        label = { Text("Nombre") },
+                        label = { Text(stringResource(R.string.transfer_name)) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
                     )
@@ -253,21 +259,21 @@ private fun TransferScreen(
                 RadioRow(playlist.name, selected = playlist == state.existingTarget) { vm.selectExisting(playlist) }
             }
 
-            item { Section("3. Cómo") }
+            item { Section(stringResource(R.string.transfer_how)) }
             items(TransferMode.entries) { mode ->
                 val (title, detail) = when (mode) {
-                    TransferMode.Copy -> "Copiar" to "Agrega las canciones al destino; el origen no cambia."
-                    TransferMode.Move -> "Mover" to "Copia y después saca del origen las canciones que encontró."
-                    TransferMode.Sync -> "Sincronizar" to "Las dos playlists quedan con todas las canciones. Requiere una playlist existente."
+                    TransferMode.Copy -> stringResource(R.string.transfer_copy) to stringResource(R.string.transfer_copy_detail)
+                    TransferMode.Move -> stringResource(R.string.transfer_move) to stringResource(R.string.transfer_move_detail)
+                    TransferMode.Sync -> stringResource(R.string.transfer_sync) to stringResource(R.string.transfer_sync_detail)
                 }
                 val enabled = mode != TransferMode.Sync || state.existingTarget != null
                 RadioRow(title, detail, selected = mode == state.mode, enabled = enabled) { vm.setMode(mode) }
             }
 
-            state.error?.let { item { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(16.dp)) } }
+            state.readErrorService?.let { item { Text(stringResource(R.string.transfer_read_error, it), color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(16.dp)) } }
             item {
                 Button(onClick = vm::start, enabled = state.canStart, modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-                    Text("Empezar")
+                    Text(stringResource(R.string.transfer_start))
                 }
             }
         }
@@ -279,40 +285,43 @@ private fun ProgressView(progress: TransferProgress, onDone: () -> Unit, modifie
     Column(modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         when (progress) {
             is TransferProgress.Reading -> {
-                Text("Leyendo ${progress.serviceName}…")
+                Text(stringResource(R.string.transfer_reading, progress.serviceName))
                 LinearProgressIndicator(Modifier.fillMaxWidth())
             }
             is TransferProgress.Matching -> {
-                Text("Buscando canciones: ${progress.done} de ${progress.total}")
+                Text(stringResource(R.string.transfer_matching, progress.done, progress.total))
                 LinearProgressIndicator(progress = { progress.done.toFloat() / progress.total.coerceAtLeast(1) }, modifier = Modifier.fillMaxWidth())
             }
             TransferProgress.Writing -> {
-                Text("Guardando cambios…")
+                Text(stringResource(R.string.transfer_writing))
                 LinearProgressIndicator(Modifier.fillMaxWidth())
             }
             is TransferProgress.Failed -> {
-                Text(progress.message, color = MaterialTheme.colorScheme.error)
-                Button(onClick = onDone) { Text("Volver a intentar") }
+                Text(
+                    stringResource(R.string.transfer_failed) + progress.message.takeIf { it.isNotBlank() }?.let { " ($it)" }.orEmpty(),
+                    color = MaterialTheme.colorScheme.error,
+                )
+                Button(onClick = onDone) { Text(stringResource(R.string.transfer_retry)) }
             }
             is TransferProgress.Done -> {
                 val r = progress.report
-                Text("Listo: \"${r.target.name}\"", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                Text("${r.addedToTarget} agregadas · ${r.alreadyInTarget} ya estaban · ${r.notFound.size} no encontradas")
-                if (r.removedFromSource > 0) Text("${r.removedFromSource} quitadas del origen")
-                if (r.addedToSource > 0) Text("${r.addedToSource} agregadas al origen")
+                Text(stringResource(R.string.transfer_done, r.target.name), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.transfer_summary, r.addedToTarget, r.alreadyInTarget, r.notFound.size))
+                if (r.removedFromSource > 0) Text(stringResource(R.string.transfer_removed, r.removedFromSource))
+                if (r.addedToSource > 0) Text(stringResource(R.string.transfer_added_back, r.addedToSource))
                 Text(
-                    "Los cambios se envían en segundo plano (⟳ en la pantalla de ordenar).",
+                    stringResource(R.string.transfer_background),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 if (r.notFound.isNotEmpty()) {
                     HorizontalDivider()
-                    Text("No encontradas", fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.transfer_not_found), fontWeight = FontWeight.Bold)
                     LazyColumn(Modifier.weight(1f)) {
                         items(r.notFound) { t -> Text("${t.title} · ${t.artistNames}", modifier = Modifier.padding(vertical = 4.dp)) }
                     }
                 }
-                Button(onClick = onDone) { Text("Hacer otra") }
+                Button(onClick = onDone) { Text(stringResource(R.string.transfer_again)) }
             }
         }
     }

@@ -41,16 +41,22 @@ internal val ContourCorner = 28.dp
 internal data class Zone(val sector: Sector, val centerDegrees: Float, val halfWidth: Float, val color: Color, val label: String)
 
 /** [withCancel]: the grey zone split into "Omitir" and "Cancelar", as while dragging with a selection. */
-internal fun swipeZones(targets: List<SlotTarget>, layout: SectorLayout, withCancel: Boolean = false): List<Zone> {
+internal fun swipeZones(
+    targets: List<SlotTarget>,
+    layout: SectorLayout,
+    withCancel: Boolean = false,
+    skipLabel: String = "",
+    cancelLabel: String = "",
+): List<Zone> {
     val half = layout.sectorWidth / 2f
     val destinations = targets.map { Zone(Sector.Destination(it.slot), layout.centerOf(it.slot), half, it.slot.color(), it.label) }
     return destinations + if (withCancel) {
         listOf(
-            Zone(Sector.Skip, layout.wheelSkipCenter, half / 2f, SkipColor, "Omitir"),
-            Zone(Sector.Cancel, layout.wheelCancelCenter, half / 2f, CancelColor, "Cancelar"),
+            Zone(Sector.Skip, layout.wheelSkipCenter, half / 2f, SkipColor, skipLabel),
+            Zone(Sector.Cancel, layout.wheelCancelCenter, half / 2f, CancelColor, cancelLabel),
         )
     } else {
-        listOf(Zone(Sector.Skip, layout.extraCenter, half, SkipColor, "Omitir"))
+        listOf(Zone(Sector.Skip, layout.extraCenter, half, SkipColor, skipLabel))
     }
 }
 

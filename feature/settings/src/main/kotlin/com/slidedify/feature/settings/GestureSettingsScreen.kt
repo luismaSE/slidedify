@@ -56,6 +56,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -227,9 +229,9 @@ fun SettingsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Ajustes") },
+                title = { Text(stringResource(R.string.settings_title)) },
                 navigationIcon = {
-                    if (onBack != null) IconButton(onClick = onBack) { Icon(AppIcons.Back, contentDescription = "Volver") }
+                    if (onBack != null) IconButton(onClick = onBack) { Icon(AppIcons.Back, contentDescription = stringResource(R.string.settings_back)) }
                 },
             )
         },
@@ -245,11 +247,11 @@ fun SettingsScreen(
             item { DestinationsCard(state, onOpenDestinations) }
 
             item {
-                SettingsGroup("Ordenar") {
+                SettingsGroup(stringResource(R.string.settings_group_sorting)) {
                     SwitchRow(
                         AppIcons.Sparkle,
-                        "Sugerir playlist",
-                        "Según el estilo de cada canción y de tus playlists",
+                        stringResource(R.string.settings_suggest),
+                        stringResource(R.string.settings_suggest_detail),
                         settings.suggestions,
                         onSuggestions,
                     )
@@ -257,25 +259,23 @@ fun SettingsScreen(
                         GroupDivider()
                         ChoiceRow(
                             icon = AppIcons.Vibration,
-                            title = "Escuchar las canciones",
-                            subtitle = "Analiza la vista previa (unos 0,5 MB por canción) para medir su energía",
+                            title = stringResource(R.string.settings_listen),
+                            subtitle = stringResource(R.string.settings_listen_detail),
                             options = AudioAnalysis.entries,
                             selected = settings.audioAnalysis,
-                            label = {
-                                when (it) {
-                                    AudioAnalysis.WifiOnly -> "Solo Wi-Fi"
-                                    AudioAnalysis.Always -> "Siempre"
-                                    AudioAnalysis.Off -> "Nunca"
-                                }
-                            },
+                            labels = mapOf(
+                                AudioAnalysis.WifiOnly to stringResource(R.string.settings_listen_wifi),
+                                AudioAnalysis.Always to stringResource(R.string.settings_listen_always),
+                                AudioAnalysis.Off to stringResource(R.string.settings_listen_never),
+                            ),
                             onSelect = onAudioAnalysis,
                         )
                     }
                     GroupDivider()
                     SwitchRow(
                         AppIcons.Swap,
-                        "Mover en vez de copiar",
-                        "Al ordenar una playlist tuya, la canción sale de ella cuando la mandás a otra",
+                        stringResource(R.string.settings_move),
+                        stringResource(R.string.settings_move_detail),
                         settings.moveFromSource,
                         onMoveFromSource,
                     )
@@ -283,10 +283,23 @@ fun SettingsScreen(
             }
 
             item {
-                SettingsGroup("Gestos") {
-                    SwitchRow(AppIcons.Hand, "Modo zurdo", "Playlists a la izquierda, omitir a la derecha", settings.leftHanded, onLeftHanded)
+                val wheelDescription = stringResource(R.string.settings_wheel_a11y)
+                SettingsGroup(stringResource(R.string.settings_group_gestures)) {
+                    SwitchRow(
+                        AppIcons.Hand,
+                        stringResource(R.string.settings_left_handed),
+                        stringResource(R.string.settings_left_handed_detail),
+                        settings.leftHanded,
+                        onLeftHanded,
+                    )
                     GroupDivider()
-                    SwitchRow(AppIcons.Vibration, "Vibración", "Al abrir la rueda y al marcar playlists", settings.haptics, onHaptics)
+                    SwitchRow(
+                        AppIcons.Vibration,
+                        stringResource(R.string.settings_haptics),
+                        stringResource(R.string.settings_haptics_detail),
+                        settings.haptics,
+                        onHaptics,
+                    )
                     GroupDivider()
                     Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 6.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -296,9 +309,9 @@ fun SettingsScreen(
                                     .padding(start = 16.dp)
                                     .weight(1f),
                             ) {
-                                Text("Abrir la rueda", style = MaterialTheme.typography.bodyLarge)
+                                Text(stringResource(R.string.settings_wheel), style = MaterialTheme.typography.bodyLarge)
                                 Text(
-                                    "Mantener apretado ${settings.holdTimeoutMs} ms",
+                                    stringResource(R.string.settings_wheel_detail, settings.holdTimeoutMs.toInt()),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
@@ -309,21 +322,21 @@ fun SettingsScreen(
                             onValueChange = { onHoldTimeout((it / 50f).roundToLong() * 50) },
                             valueRange = SortSettings.HOLD_TIMEOUT_RANGE.first.toFloat()..SortSettings.HOLD_TIMEOUT_RANGE.last.toFloat(),
                             steps = ((SortSettings.HOLD_TIMEOUT_RANGE.last - SortSettings.HOLD_TIMEOUT_RANGE.first) / 50 - 1).toInt(),
-                            modifier = Modifier.semantics { contentDescription = "Tiempo para abrir la rueda" },
+                            modifier = Modifier.semantics { contentDescription = wheelDescription },
                         )
                     }
                 }
             }
 
             item {
-                SettingsGroup("Accesibilidad") {
+                SettingsGroup(stringResource(R.string.settings_group_accessibility)) {
                     Column(Modifier.padding(16.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             RowIcon(AppIcons.Accessibility)
                             Column(Modifier.padding(start = 16.dp)) {
-                                Text("Controles", style = MaterialTheme.typography.bodyLarge)
+                                Text(stringResource(R.string.settings_controls), style = MaterialTheme.typography.bodyLarge)
                                 Text(
-                                    "Botones en lugar de gestos, útil con TalkBack",
+                                    stringResource(R.string.settings_controls_detail),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
@@ -343,9 +356,9 @@ fun SettingsScreen(
                                 ) {
                                     Text(
                                         when (mode) {
-                                            ButtonMode.Auto -> "Auto"
-                                            ButtonMode.On -> "Botones"
-                                            ButtonMode.Off -> "Gestos"
+                                            ButtonMode.Auto -> stringResource(R.string.settings_controls_auto)
+                                            ButtonMode.On -> stringResource(R.string.settings_controls_buttons)
+                                            ButtonMode.Off -> stringResource(R.string.settings_controls_gestures)
                                         },
                                     )
                                 }
@@ -355,8 +368,10 @@ fun SettingsScreen(
                     GroupDivider()
                     NavRow(
                         AppIcons.Refresh,
-                        "Ver el tutorial de nuevo",
-                        if (tutorialQueued || !settings.tutorialCompleted) "Se mostrará la próxima vez que ordenes" else "Cómo deslizar y usar la rueda",
+                        stringResource(R.string.settings_tutorial),
+                        stringResource(
+                            if (tutorialQueued || !settings.tutorialCompleted) R.string.settings_tutorial_queued else R.string.settings_tutorial_detail,
+                        ),
                     ) {
                         tutorialQueued = true
                         onReplayTutorial()
@@ -365,28 +380,31 @@ fun SettingsScreen(
             }
 
             item {
-                SettingsGroup("Apariencia") {
+                SettingsGroup(stringResource(R.string.settings_group_appearance)) {
                     ChoiceRow(
                         icon = AppIcons.Tune,
-                        title = "Tema",
-                        subtitle = "Oscuro, claro o el mismo que el teléfono",
+                        title = stringResource(R.string.settings_theme),
+                        subtitle = stringResource(R.string.settings_theme_detail),
                         options = listOf(ThemeMode.Dark, ThemeMode.Light, ThemeMode.System),
                         selected = settings.theme,
-                        label = {
-                            when (it) {
-                                ThemeMode.Dark -> "Oscuro"
-                                ThemeMode.Light -> "Claro"
-                                ThemeMode.System -> "Sistema"
-                            }
-                        },
+                        labels = mapOf(
+                            ThemeMode.Dark to stringResource(R.string.settings_theme_dark),
+                            ThemeMode.Light to stringResource(R.string.settings_theme_light),
+                            ThemeMode.System to stringResource(R.string.settings_theme_system),
+                        ),
                         onSelect = onTheme,
                     )
                 }
             }
 
             item {
-                SettingsGroup("Cuenta") {
-                    NavRow(AppIcons.Link, "Conexiones", "Servicio activo: ${state.providerName}", onOpenConnections)
+                SettingsGroup(stringResource(R.string.settings_group_account)) {
+                    NavRow(
+                        AppIcons.Link,
+                        stringResource(R.string.settings_connections),
+                        stringResource(R.string.settings_active_service, state.providerName),
+                        onOpenConnections,
+                    )
                 }
             }
 
@@ -411,18 +429,17 @@ private fun DestinationsCard(state: SettingsUiState, onClick: () -> Unit) {
                     .padding(start = 16.dp)
                     .weight(1f),
             ) {
-                Text("DESTINOS", style = OverlineStyle, color = MaterialTheme.colorScheme.primary)
+                Text(stringResource(R.string.settings_destinations_overline), style = OverlineStyle, color = MaterialTheme.colorScheme.primary)
                 Text(
                     when (val n = state.gestureMap.size) {
-                        0 -> "Sin destinos"
-                        1 -> "1 destino"
-                        else -> "$n destinos"
+                        0 -> stringResource(R.string.settings_no_destinations)
+                        else -> pluralStringResource(R.plurals.settings_destinations_count, n, n)
                     },
                     style = MaterialTheme.typography.titleMedium,
                     modifier = Modifier.padding(top = 2.dp),
                 )
                 Text(
-                    "A qué playlist va cada dirección en ${state.providerName}",
+                    stringResource(R.string.settings_destinations_detail, state.providerName),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -447,7 +464,7 @@ private fun About() {
         CompassMark(size = 40.dp)
         Text("Compass", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 8.dp))
         Text(
-            listOfNotNull(version?.let { "Versión $it" }, "Ordená tu música con gestos").joinToString(" · "),
+            listOfNotNull(version?.let { stringResource(R.string.settings_version, it) }, stringResource(R.string.settings_tagline)).joinToString(" · "),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -487,9 +504,9 @@ fun DestinationsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Destinos") },
-                navigationIcon = { IconButton(onClick = onBack) { Icon(AppIcons.Back, contentDescription = "Volver") } },
-                actions = { TextButton(onClick = onResetMap) { Text("Restablecer") } },
+                title = { Text(stringResource(R.string.destinations_title)) },
+                navigationIcon = { IconButton(onClick = onBack) { Icon(AppIcons.Back, contentDescription = stringResource(R.string.settings_back)) } },
+                actions = { TextButton(onClick = onResetMap) { Text(stringResource(R.string.destinations_reset)) } },
             )
         },
         containerColor = MaterialTheme.colorScheme.background,
@@ -510,9 +527,7 @@ fun DestinationsScreen(
                 Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
                     SectorPreview(state.gestureMap.size, state.settings.leftHanded, size = 168.dp)
                     Text(
-                        "El círculo se reparte en partes iguales entre tus destinos y la zona gris de omitir. " +
-                            "Con las flechas cambiás su lugar (en sentido horario, empezando junto a la zona gris). " +
-                            "Un destino puede mandar a varias playlists a la vez.",
+                        stringResource(R.string.destinations_help),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 16.dp, bottom = 8.dp, start = 8.dp, end = 8.dp),
@@ -536,29 +551,29 @@ fun DestinationsScreen(
                                 .weight(1f),
                         ) {
                             Text(
-                                chosen.joinToString(" + ") { it.name }.ifEmpty { "Sin playlist" },
+                                chosen.joinToString(" + ") { it.name }.ifEmpty { stringResource(R.string.destinations_no_playlist) },
                                 style = MaterialTheme.typography.titleSmall,
                                 maxLines = 2,
                                 overflow = TextOverflow.Ellipsis,
                             )
                             Text(
-                                if (chosen.size > 1) "Combo · ${chosen.size} playlists" else "Tocá para cambiar",
+                                if (chosen.size > 1) stringResource(R.string.destinations_combo, chosen.size) else stringResource(R.string.destinations_tap_to_change),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
                         // Move around the circle (clockwise, starting next to the grey zone): earlier / later.
                         IconButton(onClick = { onMoveDestination(slot, Slot(slot.index - 1)) }, enabled = slot.index > 0) {
-                            Icon(AppIcons.Chevron, contentDescription = "Mover antes en el círculo", modifier = Modifier.rotate(-90f))
+                            Icon(AppIcons.Chevron, contentDescription = stringResource(R.string.destinations_move_earlier), modifier = Modifier.rotate(-90f))
                         }
                         IconButton(
                             onClick = { onMoveDestination(slot, Slot(slot.index + 1)) },
                             enabled = slot.index < state.gestureMap.size - 1,
                         ) {
-                            Icon(AppIcons.Chevron, contentDescription = "Mover después en el círculo", modifier = Modifier.rotate(90f))
+                            Icon(AppIcons.Chevron, contentDescription = stringResource(R.string.destinations_move_later), modifier = Modifier.rotate(90f))
                         }
                         IconButton(onClick = { onRemoveDestination(slot) }) {
-                            Icon(AppIcons.Close, contentDescription = "Quitar destino", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Icon(AppIcons.Close, contentDescription = stringResource(R.string.destinations_remove), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 }
@@ -566,7 +581,7 @@ fun DestinationsScreen(
             item {
                 if (state.gestureMap.isFull) {
                     Text(
-                        "Llegaste al máximo de ${GestureMap.MAX_DESTINATIONS} destinos.",
+                        stringResource(R.string.destinations_max, GestureMap.MAX_DESTINATIONS),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(8.dp),
@@ -580,7 +595,7 @@ fun DestinationsScreen(
                             .height(52.dp),
                     ) {
                         Icon(AppIcons.Add, contentDescription = null)
-                        Text("Agregar destino", modifier = Modifier.padding(start = 8.dp))
+                        Text(stringResource(R.string.destinations_add), modifier = Modifier.padding(start = 8.dp))
                     }
                 }
             }
@@ -590,7 +605,7 @@ fun DestinationsScreen(
     editing?.let { slot ->
         val isNew = slot == NEW
         PlaylistPickerSheet(
-            title = if (isNew) "Nuevo destino" else "Playlists de este destino",
+            title = stringResource(if (isNew) R.string.destinations_new else R.string.destinations_edit),
             playlists = state.playlists,
             initial = if (isNew) emptySet() else state.gestureMap.playlistsAt(slot),
             onDismiss = { editing = null },
@@ -658,7 +673,7 @@ private fun PlaylistPickerSheet(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(title, style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
                 Button(onClick = { onConfirm(selected) }, enabled = selected.isNotEmpty()) {
-                    Text(if (selected.size > 1) "Listo (${selected.size})" else "Listo")
+                    Text(if (selected.size > 1) stringResource(R.string.destinations_done_count, selected.size) else stringResource(R.string.destinations_done))
                 }
             }
             if (playlists.size > 6) {
@@ -666,7 +681,7 @@ private fun PlaylistPickerSheet(
                     value = query,
                     onValueChange = { query = it },
                     singleLine = true,
-                    placeholder = { Text("Buscar playlist") },
+                    placeholder = { Text(stringResource(R.string.destinations_search)) },
                     leadingIcon = { Icon(AppIcons.Search, contentDescription = null) },
                     shape = CircleShape,
                     modifier = Modifier
@@ -769,7 +784,7 @@ private fun <T> ChoiceRow(
     subtitle: String,
     options: List<T>,
     selected: T,
-    label: (T) -> String,
+    labels: Map<T, String>,
     onSelect: (T) -> Unit,
 ) {
     Column(Modifier.padding(16.dp)) {
@@ -790,7 +805,7 @@ private fun <T> ChoiceRow(
                     selected = selected == option,
                     onClick = { onSelect(option) },
                     shape = SegmentedButtonDefaults.itemShape(index, options.size),
-                ) { Text(label(option), maxLines = 1) }
+                ) { Text(labels[option].orEmpty(), maxLines = 1) }
             }
         }
     }

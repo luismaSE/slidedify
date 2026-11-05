@@ -56,6 +56,8 @@ tap_scrolling() {
 }
 
 adb install -r "$APK"
+# The walkthrough looks for Spanish texts; the emulator itself is in English.
+adb shell cmd locale set-app-locales "$PKG" --locales es-AR || true
 adb logcat -c
 adb shell am start -W -n "$PKG/.MainActivity"
 check "launch" 15

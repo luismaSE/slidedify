@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="connections_title">Conexiones</string>
+    <string name="connections_intro">Conectá tus servicios de música. El activo es el que usás para ordenar; podés cambiarlo cuando quieras.</string>
+    <string name="connections_soon">PRÓXIMAMENTE</string>
+    <string name="connections_disconnect_title">¿Desconectar %1$s?</string>
+    <string name="connections_disconnect_text">Tu progreso queda guardado en este teléfono. Para volver a usarlo vas a tener que iniciar sesión de nuevo.</string>
+    <string name="connections_disconnect">Desconectar</string>
+    <string name="connections_cancel">Cancelar</string>
+    <string name="connections_active">Activo</string>
+    <string name="connections_use">Usar este</string>
+    <string name="connections_connect">Conectar</string>
+    <string name="connections_not_in_build">No se puede conectar desde esta versión.</string>
+    <string name="connections_signed_in">Conectado como %1$s</string>
+    <string name="connections_signed_out">Sin conectar</string>
+    <string name="capability_like">Me gusta</string>
+    <string name="capability_create">Crear playlists</string>
+    <string name="capability_receive">Recibe transferencias</string>
+    <string name="capability_full">Reproducción completa</string>
+    <string name="capability_previews">Vistas previas</string>
+    <string name="connections_not_enabled">Todavía no está activado en esta versión</string>
+    <string name="connections_synced">Todo sincronizado</string>
+    <plurals name="connections_pending">
+        <item quantity="one">%1$d cambio por sincronizar</item>
+        <item quantity="other">%1$d cambios por sincronizar</item>
+    </plurals>
+    <string name="connections_sync_hint">Los cambios se guardan en el teléfono y se envían solos cuando hay conexión.</string>
+</resources>

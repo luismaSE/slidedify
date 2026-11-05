@@ -1,5 +1,6 @@
 package com.slidedify.feature.swipe
 
+import androidx.compose.ui.res.stringResource
 import android.view.accessibility.AccessibilityManager
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -71,13 +72,13 @@ internal fun ButtonPanel(track: Track, state: SwipeUiState, actions: SwipeAction
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             if (state.canLike) {
-                OutlinedButton(onClick = actions.onDoubleTap) { Text(if (state.isLiked) "♥ Me gusta" else "♡ Me gusta") }
+                OutlinedButton(onClick = actions.onDoubleTap) { Text(stringResource(if (state.isLiked) R.string.buttons_like else R.string.buttons_not_liked)) }
             }
             Button(
                 onClick = { actions.onWheelCommit(selected) },
                 enabled = selected.isNotEmpty(),
                 modifier = Modifier.weight(1f),
-            ) { Text(if (selected.isEmpty()) "Agregar" else "Agregar (${selected.size})") }
+            ) { Text(if (selected.isEmpty()) stringResource(R.string.buttons_add) else stringResource(R.string.buttons_add_count, selected.size)) }
         }
     }
 }

@@ -40,6 +40,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
@@ -147,7 +149,7 @@ fun ConnectionsScreen(
     var confirmDisconnect by remember { mutableStateOf<Connection?>(null) }
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text("Conexiones") }) },
+        topBar = { TopAppBar(title = { Text(stringResource(R.string.connections_title)) }) },
         containerColor = MaterialTheme.colorScheme.background,
     ) { padding ->
         LazyColumn(
@@ -159,7 +161,7 @@ fun ConnectionsScreen(
         ) {
             item {
                 Text(
-                    "Conectá tus servicios de música. El activo es el que usás para ordenar; podés cambiarlo cuando quieras.",
+                    stringResource(R.string.connections_intro),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(start = 4.dp, end = 4.dp, bottom = 4.dp),
@@ -174,7 +176,7 @@ fun ConnectionsScreen(
                 )
             }
             if (state.unavailable.isNotEmpty()) {
-                item { Text("PRÓXIMAMENTE", style = OverlineStyle, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 4.dp, top = 12.dp)) }
+                item { Text(stringResource(R.string.connections_soon), style = OverlineStyle, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 4.dp, top = 12.dp)) }
                 items(state.unavailable, key = { "soon-$it" }) { name -> UnavailableRow(name) }
             }
             item { SyncCard(state.pendingSync) }
@@ -184,15 +186,15 @@ fun ConnectionsScreen(
     confirmDisconnect?.let { connection ->
         AlertDialog(
             onDismissRequest = { confirmDisconnect = null },
-            title = { Text("¿Desconectar ${connection.name}?") },
-            text = { Text("Tu progreso queda guardado en este teléfono. Para volver a usarlo vas a tener que iniciar sesión de nuevo.") },
+            title = { Text(stringResource(R.string.connections_disconnect_title, connection.name)) },
+            text = { Text(stringResource(R.string.connections_disconnect_text)) },
             confirmButton = {
                 TextButton(onClick = {
                     onDisconnect(connection.id)
                     confirmDisconnect = null
-                }) { Text("Desconectar", color = MaterialTheme.colorScheme.error) }
+                }) { Text(stringResource(R.string.connections_disconnect), color = MaterialTheme.colorScheme.error) }
             },
-            dismissButton = { TextButton(onClick = { confirmDisconnect = null }) { Text("Cancelar") } },
+            dismissButton = { TextButton(onClick = { confirmDisconnect = null }) { Text(stringResource(R.string.connections_cancel)) } },
         )
     }
 }
@@ -218,7 +220,7 @@ private fun ConnectionCard(connection: Connection, onConnect: () -> Unit, onDisc
                     Text(connection.name, style = MaterialTheme.typography.titleMedium)
                     StatusLine(connection.auth)
                 }
-                if (connection.isActive) Tag("Activo")
+                if (connection.isActive) Tag(stringResource(R.string.connections_active))
             }
 
             FlowRow(
@@ -231,20 +233,20 @@ private fun ConnectionCard(connection: Connection, onConnect: () -> Unit, onDisc
 
             Row(Modifier.padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 when {
-                    signedIn && !connection.isActive -> Button(onClick = onUse) { Text("Usar este") }
-                    !signedIn && connection.canSignIn -> Button(onClick = onConnect) { Text("Conectar") }
+                    signedIn && !connection.isActive -> Button(onClick = onUse) { Text(stringResource(R.string.connections_use)) }
+                    !signedIn && connection.canSignIn -> Button(onClick = onConnect) { Text(stringResource(R.string.connections_connect)) }
                     else -> Unit
                 }
                 if (signedIn && connection.canSignIn) {
                     OutlinedButton(onClick = onDisconnect) {
                         Icon(AppIcons.Logout, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(6.dp))
-                        Text("Desconectar")
+                        Text(stringResource(R.string.connections_disconnect))
                     }
                 }
                 if (!signedIn && !connection.canSignIn) {
                     Text(
-                        "No se puede conectar desde esta versión.",
+                        stringResource(R.string.connections_not_in_build),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -257,9 +259,9 @@ private fun ConnectionCard(connection: Connection, onConnect: () -> Unit, onDisc
 @Composable
 private fun StatusLine(auth: AuthState) {
     val (color, text) = when (auth) {
-        is AuthState.SignedIn -> MaterialTheme.colorScheme.primary to "Conectado como ${auth.userName}"
+        is AuthState.SignedIn -> MaterialTheme.colorScheme.primary to stringResource(R.string.connections_signed_in, auth.userName)
         is AuthState.Error -> MaterialTheme.colorScheme.error to auth.message
-        AuthState.SignedOut -> MaterialTheme.colorScheme.onSurfaceVariant to "Sin conectar"
+        AuthState.SignedOut -> MaterialTheme.colorScheme.onSurfaceVariant to stringResource(R.string.connections_signed_out)
     }
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 2.dp)) {
         Box(
@@ -291,11 +293,12 @@ private fun Capability(label: String) {
     )
 }
 
+@Composable
 private fun ProviderCapabilities.labels(): List<String> = buildList {
-    if (canLike) add("Me gusta")
-    if (canCreatePlaylists) add("Crear playlists")
-    if (canSearch) add("Recibe transferencias")
-    add(if (canPlayFullTracks) "Reproducción completa" else "Vistas previas")
+    if (canLike) add(stringResource(R.string.capability_like))
+    if (canCreatePlaylists) add(stringResource(R.string.capability_create))
+    if (canSearch) add(stringResource(R.string.capability_receive))
+    add(stringResource(if (canPlayFullTracks) R.string.capability_full else R.string.capability_previews))
 }
 
 @Composable
@@ -315,7 +318,7 @@ private fun UnavailableRow(name: String) {
             ) {
                 Text(name, style = MaterialTheme.typography.titleSmall)
                 Text(
-                    "Todavía no está activado en esta versión",
+                    stringResource(R.string.connections_not_enabled),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -341,11 +344,11 @@ private fun SyncCard(pending: Int) {
             )
             Column(Modifier.padding(start = 14.dp)) {
                 Text(
-                    if (pending == 0) "Todo sincronizado" else "$pending cambios por sincronizar",
+                    if (pending == 0) stringResource(R.string.connections_synced) else pluralStringResource(R.plurals.connections_pending, pending, pending),
                     style = MaterialTheme.typography.titleSmall,
                 )
                 Text(
-                    "Los cambios se guardan en el teléfono y se envían solos cuando hay conexión.",
+                    stringResource(R.string.connections_sync_hint),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

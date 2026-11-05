@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="transfer_title">Transfer</string>
+    <string name="transfer_back">Back</string>
+    <string name="transfer_empty_title">Move your music between services</string>
+    <string name="transfer_empty_text">Connect at least two services to copy, move or sync playlists between them.</string>
+    <string name="transfer_go_connections">Go to Connections</string>
+    <string name="transfer_from">1. From</string>
+    <string name="transfer_to">2. To</string>
+    <string name="transfer_how">3. How</string>
+    <string name="transfer_liked">Liked songs</string>
+    <string name="transfer_unavailable">%1$s (unavailable)</string>
+    <string name="transfer_new_playlist">New playlist</string>
+    <string name="transfer_name">Name</string>
+    <string name="transfer_copy">Copy</string>
+    <string name="transfer_copy_detail">Adds the songs to the destination; the source doesn\'t change.</string>
+    <string name="transfer_move">Move</string>
+    <string name="transfer_move_detail">Copies, then removes from the source the songs it found.</string>
+    <string name="transfer_sync">Sync</string>
+    <string name="transfer_sync_detail">Both playlists end up with all the songs. Needs an existing playlist.</string>
+    <string name="transfer_read_error">Couldn\'t read the playlists from %1$s</string>
+    <string name="transfer_start">Start</string>
+    <string name="transfer_reading">Reading %1$s…</string>
+    <string name="transfer_matching">Finding songs: %1$d of %2$d</string>
+    <string name="transfer_writing">Saving changes…</string>
+    <string name="transfer_failed">The transfer couldn\'t be completed</string>
+    <string name="transfer_retry">Try again</string>
+    <string name="transfer_done">Done: «%1$s»</string>
+    <string name="transfer_summary">%1$d added · %2$d already there · %3$d not found</string>
+    <string name="transfer_removed">%1$d removed from the source</string>
+    <string name="transfer_added_back">%1$d added to the source</string>
+    <string name="transfer_background">Changes are sent in the background (⟳ on the sorting screen).</string>
+    <string name="transfer_not_found">Not found</string>
+    <string name="transfer_again">Do another</string>
+</resources>

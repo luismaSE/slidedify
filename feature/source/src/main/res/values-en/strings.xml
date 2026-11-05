@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="source_liked">Liked songs</string>
+    <string name="source_top">Your top tracks</string>
+    <string name="home_your_playlists">Your playlists</string>
+    <string name="home_your_playlists_count">Your playlists · %1$d</string>
+    <string name="home_recent">Recent</string>
+    <string name="home_shortcuts">Shortcuts</string>
+    <string name="home_no_playlists">No playlists yet</string>
+    <string name="home_no_playlists_hint">Create one from the sorting screen with the «Playlist» button.</string>
+    <string name="home_no_results">No results</string>
+    <string name="home_no_results_hint">No playlists match «%1$s».</string>
+    <string name="home_service_switcher">Service: %1$s. Tap to change</string>
+    <string name="home_active">Active</string>
+    <string name="home_manage_connections">Manage connections</string>
+    <string name="home_hello">Hi</string>
+    <string name="home_hello_name">Hi, %1$s</string>
+    <string name="home_what_today">What shall we sort today?</string>
+    <string name="home_continue_title">PICK UP WHERE YOU LEFT OFF</string>
+    <string name="home_done_title">ALL DONE</string>
+    <string name="home_continue">Continue</string>
+    <string name="home_review_again">Review again</string>
+    <string name="home_start">Start</string>
+    <string name="home_tag_last">Last</string>
+    <string name="home_tag_followed">Followed</string>
+    <string name="home_playlist">Playlist</string>
+    <string name="home_finished">Done</string>
+    <string name="home_search">Search playlists</string>
+    <string name="home_clear_search">Clear search</string>
+    <string name="home_retry">Retry</string>
+    <string name="home_load_error">Couldn\'t load your playlists</string>
+    <string name="home_welcome">Welcome to Compass</string>
+    <string name="home_welcome_text">Sort your music by swiping: each song goes to the playlist you pick with a gesture.</string>
+    <string name="home_step1">Connect your account</string>
+    <string name="home_step1_detail">Spotify or another supported service.</string>
+    <string name="home_step2">Pick what to sort</string>
+    <string name="home_step2_detail">Your liked songs or any playlist.</string>
+    <string name="home_step3">Swipe</string>
+    <string name="home_step3_detail">Towards a playlist, or across several without lifting.</string>
+    <string name="home_connect_with">Connect with %1$s</string>
+    <string name="home_see_services">See available services</string>
+    <string name="home_try_demo">Try without an account (demo)</string>
+    <string name="progress_complete">Complete</string>
+    <string name="progress_percent">%1$d%% sorted</string>
+    <string name="progress_of">%1$d of %2$d</string>
+    <string name="progress_not_started">Not started</string>
+    <plurals name="progress_reviewed">
+        <item quantity="one">%1$d reviewed</item>
+        <item quantity="other">%1$d reviewed</item>
+    </plurals>
+    <plurals name="songs_count">
+        <item quantity="one">%1$d song</item>
+        <item quantity="other">%1$d songs</item>
+    </plurals>
+    <string name="time_just_now">just now</string>
+    <string name="time_minutes">%1$d min ago</string>
+    <string name="time_hours">%1$d h ago</string>
+    <string name="time_yesterday">yesterday</string>
+    <plurals name="time_days">
+        <item quantity="one">%1$d day ago</item>
+        <item quantity="other">%1$d days ago</item>
+    </plurals>
+</resources>

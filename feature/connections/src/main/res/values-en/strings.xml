@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="connections_title">Connections</string>
+    <string name="connections_intro">Connect your music services. The active one is the one you sort with; you can switch any time.</string>
+    <string name="connections_soon">COMING SOON</string>
+    <string name="connections_disconnect_title">Disconnect %1$s?</string>
+    <string name="connections_disconnect_text">Your progress stays on this phone. To use it again you\'ll have to sign in again.</string>
+    <string name="connections_disconnect">Disconnect</string>
+    <string name="connections_cancel">Cancel</string>
+    <string name="connections_active">Active</string>
+    <string name="connections_use">Use this one</string>
+    <string name="connections_connect">Connect</string>
+    <string name="connections_not_in_build">Can\'t be connected in this version.</string>
+    <string name="connections_signed_in">Signed in as %1$s</string>
+    <string name="connections_signed_out">Not connected</string>
+    <string name="capability_like">Liked songs</string>
+    <string name="capability_create">Create playlists</string>
+    <string name="capability_receive">Receives transfers</string>
+    <string name="capability_full">Full playback</string>
+    <string name="capability_previews">Previews</string>
+    <string name="connections_not_enabled">Not enabled in this version yet</string>
+    <string name="connections_synced">All synced</string>
+    <plurals name="connections_pending">
+        <item quantity="one">%1$d change to sync</item>
+        <item quantity="other">%1$d changes to sync</item>
+    </plurals>
+    <string name="connections_sync_hint">Changes are saved on the phone and sent automatically when online.</string>
+</resources>

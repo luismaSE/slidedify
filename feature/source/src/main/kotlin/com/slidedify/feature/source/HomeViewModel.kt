@@ -58,10 +58,12 @@ data class HomeUiState(
     val continueCard: SourceCard? = null,
     /** Other sources opened lately. */
     val recent: List<SourceCard> = emptyList(),
-    /** "Me gusta" and "Lo que más escuchás". */
+    /** Liked songs and top tracks. */
     val shortcuts: List<SourceCard> = emptyList(),
     val playlists: List<SourceCard> = emptyList(),
-    val error: String? = null,
+    /** The playlists couldn't be loaded; [errorDetail] is the technical reason, if any. */
+    val loadFailed: Boolean = false,
+    val errorDetail: String? = null,
 ) {
     val userName: String? get() = (auth as? AuthState.SignedIn)?.userName
     val demo: ProviderChoice? get() = providers.firstOrNull { it.id.value == "demo" }
@@ -137,7 +139,8 @@ class HomeViewModel @Inject constructor(
             auth = auth,
             canSignIn = signIns.any { it.providerId == provider.id },
             isLoading = load is LibraryLoad.Loading,
-            error = (load as? LibraryLoad.Failed)?.let { "No se pudieron cargar tus playlists${it.message?.let { m -> " ($m)" }.orEmpty()}" },
+            loadFailed = load is LibraryLoad.Failed,
+            errorDetail = (load as? LibraryLoad.Failed)?.message,
         )
         if (auth !is AuthState.SignedIn) return base.copy(isLoading = false)
 
@@ -161,8 +164,8 @@ class HomeViewModel @Inject constructor(
 
         val shortcuts = buildList {
             val kinds = provider.capabilities.sources
-            if (TrackSource.Kind.LikedSongs in kinds) add(card(TrackSource.LikedSongs, LIKED))
-            if (TrackSource.Kind.Recommended in kinds) add(card(TrackSource.Recommended, TOP))
+            if (TrackSource.Kind.LikedSongs in kinds) add(card(TrackSource.LikedSongs, ""))
+            if (TrackSource.Kind.Recommended in kinds) add(card(TrackSource.Recommended, ""))
         }
         // Own playlists first, then followed ones.
         val playlistCards = playlists.sortedBy { !it.canWrite }
@@ -172,7 +175,8 @@ class HomeViewModel @Inject constructor(
             when (val source = entry.source) {
                 is TrackSource.FromPlaylist -> playlistsById[source.id]?.let { card(source, it.name, it.imageUrl, it.trackCount) }
                     ?: if (load is LibraryLoad.Loaded) null else card(source, entry.title)
-                else -> card(source, entry.title)
+                // Liked songs / top tracks are named by the screen, in the user's language.
+                else -> card(source, "")
             }
         }
         return base.copy(
@@ -181,10 +185,5 @@ class HomeViewModel @Inject constructor(
             shortcuts = shortcuts,
             playlists = playlistCards,
         )
-    }
-
-    private companion object {
-        const val LIKED = "Me gusta"
-        const val TOP = "Lo que más escuchás"
     }
 }

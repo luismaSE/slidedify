@@ -1,5 +1,6 @@
 package com.slidedify.feature.swipe
 
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -98,7 +99,8 @@ internal fun TrackListSheet(
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
-                "✓ ${state.sortedCount} de ${state.total} revisadas${if (state.isLoadingMore) " · cargando…" else ""}",
+                stringResource(R.string.list_reviewed, state.sortedCount, state.total) +
+                    if (state.isLoadingMore) " " + stringResource(R.string.list_loading) else "",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -106,12 +108,12 @@ internal fun TrackListSheet(
                 value = options.query,
                 onValueChange = { onOptionsChange(options.copy(query = it)) },
                 singleLine = true,
-                placeholder = { Text("Buscar canción, artista o álbum") },
+                placeholder = { Text(stringResource(R.string.list_search)) },
                 leadingIcon = { Icon(AppIcons.Search, contentDescription = null) },
                 trailingIcon = {
                     if (options.query.isNotEmpty()) {
                         IconButton(onClick = { onOptionsChange(options.copy(query = "")) }) {
-                            Icon(AppIcons.Close, contentDescription = "Borrar búsqueda")
+                            Icon(AppIcons.Close, contentDescription = stringResource(R.string.list_clear_search))
                         }
                     }
                 },
@@ -122,11 +124,10 @@ internal fun TrackListSheet(
             )
             Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 OrderMenu(state, options, onOptionsChange)
+                val directionDescription = stringResource(if (options.descending) R.string.list_descending_a11y else R.string.list_ascending_a11y)
                 IconButton(
                     onClick = { onOptionsChange(options.copy(descending = !options.descending)) },
-                    modifier = Modifier.semantics {
-                        contentDescription = if (options.descending) "Orden descendente. Tocá para invertir" else "Orden ascendente. Tocá para invertir"
-                    },
+                    modifier = Modifier.semantics { contentDescription = directionDescription },
                 ) {
                     Text(if (options.descending) "↓" else "↑", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 }
@@ -146,7 +147,7 @@ internal fun TrackListSheet(
                     FilterChip(
                         selected = options.filter == filter,
                         onClick = { onOptionsChange(options.copy(filter = filter)) },
-                        label = { Text("${filter.label} · $count") },
+                        label = { Text(stringResource(R.string.list_filter_count, filter.label(), count)) },
                     )
                 }
             }
@@ -154,18 +155,24 @@ internal fun TrackListSheet(
 
         if (rows.isEmpty()) {
             Text(
-                "No hay canciones con estos filtros.",
+                stringResource(R.string.list_empty),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(24.dp),
             )
         }
+        val noDate = stringResource(R.string.list_no_date)
+        val addedOn = stringResource(R.string.list_added_on, "%s")
+        val continueHere = stringResource(R.string.list_continue_here)
+        val reviewedState = stringResource(R.string.list_reviewed_state)
+        val pendingState = stringResource(R.string.list_pending_state)
+        val currentState = stringResource(R.string.list_current_state)
         LazyColumn(state = listState, contentPadding = PaddingValues(bottom = 24.dp), modifier = Modifier.fillMaxWidth()) {
             items(rows, key = { it.value.id.value }) { (index, track) ->
                 val isCurrent = index == state.position
                 val reviewed = track.id in state.sortedIds
                 val detail = when (options.order) {
-                    TrackOrder.Added -> track.addedAt?.let { "Agregada ${dateFormat.format(Date(it))}" } ?: "Sin fecha"
+                    TrackOrder.Added -> track.addedAt?.let { addedOn.format(dateFormat.format(Date(it))) } ?: noDate
                     TrackOrder.Album -> track.album.name
                     TrackOrder.Duration -> formatTime(track.durationMs)
                     else -> null
@@ -173,11 +180,11 @@ internal fun TrackListSheet(
                 Row(
                     Modifier
                         .fillMaxWidth()
-                        .clickable(onClickLabel = "Seguir desde esta canción") { onPick(index) }
+                        .clickable(onClickLabel = continueHere) { onPick(index) }
                         .background(if (isCurrent) MaterialTheme.colorScheme.primary.copy(alpha = 0.08f) else Color.Transparent)
                         .padding(horizontal = 16.dp, vertical = 8.dp)
                         .semantics(mergeDescendants = true) {
-                            contentDescription = "${track.title}, ${track.artistNames}, ${if (reviewed) "revisada" else "pendiente"}${if (isCurrent) ", actual" else ""}"
+                            contentDescription = "${track.title}, ${track.artistNames}, ${if (reviewed) reviewedState else pendingState}${if (isCurrent) currentState else ""}"
                         },
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -228,14 +235,14 @@ private fun OrderMenu(state: SwipeUiState, options: TrackListOptions, onOptionsC
     Box {
         TextButton(onClick = { open = true }) {
             Icon(AppIcons.Sort, contentDescription = null, modifier = Modifier.size(18.dp))
-            Text("Ordenar: ${options.order.label}", modifier = Modifier.padding(start = 6.dp))
+            Text(stringResource(R.string.list_order, options.order.label()), modifier = Modifier.padding(start = 6.dp))
         }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
             availableOrders(state.queue).forEach { order ->
                 DropdownMenuItem(
-                    text = { Text(order.label) },
+                    text = { Text(order.label()) },
                     trailingIcon = {
-                        if (order == options.order) Icon(AppIcons.Check, contentDescription = "Elegido", tint = MaterialTheme.colorScheme.primary)
+                        if (order == options.order) Icon(AppIcons.Check, contentDescription = stringResource(R.string.list_chosen), tint = MaterialTheme.colorScheme.primary)
                     },
                     onClick = {
                         open = false
@@ -248,12 +255,36 @@ private fun OrderMenu(state: SwipeUiState, options: TrackListOptions, onOptionsC
 }
 
 /** What ↑/↓ means for the current order, in words. */
-private fun directionLabel(options: TrackListOptions): String = when (options.order) {
-    TrackOrder.Source -> if (options.descending) "Del final al principio" else "Del principio al final"
-    TrackOrder.Added -> if (options.descending) "Más recientes primero" else "Más antiguas primero"
-    TrackOrder.Duration -> if (options.descending) "Más largas primero" else "Más cortas primero"
-    else -> if (options.descending) "Z → A" else "A → Z"
-}
+@Composable
+private fun directionLabel(options: TrackListOptions): String = stringResource(
+    when (options.order) {
+        TrackOrder.Source -> if (options.descending) R.string.direction_source_desc else R.string.direction_source_asc
+        TrackOrder.Added -> if (options.descending) R.string.direction_added_desc else R.string.direction_added_asc
+        TrackOrder.Duration -> if (options.descending) R.string.direction_duration_desc else R.string.direction_duration_asc
+        else -> if (options.descending) R.string.direction_text_desc else R.string.direction_text_asc
+    },
+)
+
+@Composable
+private fun TrackOrder.label(): String = stringResource(
+    when (this) {
+        TrackOrder.Source -> R.string.order_source
+        TrackOrder.Added -> R.string.order_added
+        TrackOrder.Title -> R.string.order_title
+        TrackOrder.Artist -> R.string.order_artist
+        TrackOrder.Album -> R.string.order_album
+        TrackOrder.Duration -> R.string.order_duration
+    },
+)
+
+@Composable
+private fun TrackFilter.label(): String = stringResource(
+    when (this) {
+        TrackFilter.All -> R.string.filter_all
+        TrackFilter.Pending -> R.string.filter_pending
+        TrackFilter.Reviewed -> R.string.filter_reviewed
+    },
+)
 
 /**
  * Multiple selection without the wheel: tick any playlists (destinations or not) and send the
@@ -275,7 +306,7 @@ internal fun MultiSendSheet(state: SwipeUiState, onSend: (Set<PlaylistId>) -> Un
         Column(Modifier.padding(horizontal = 16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text("Enviar a varias", style = MaterialTheme.typography.titleLarge)
+                    Text(stringResource(R.string.multi_title), style = MaterialTheme.typography.titleLarge)
                     state.current?.let {
                         Text(
                             "${it.title} · ${it.artistNames}",
@@ -287,7 +318,7 @@ internal fun MultiSendSheet(state: SwipeUiState, onSend: (Set<PlaylistId>) -> Un
                     }
                 }
                 Button(onClick = { onSend(selected) }, enabled = selected.isNotEmpty()) {
-                    Text(if (selected.isEmpty()) "Enviar" else "Enviar (${selected.size})")
+                    Text(if (selected.isEmpty()) stringResource(R.string.multi_send) else stringResource(R.string.multi_send_count, selected.size))
                 }
             }
             if (destinations.size + others.size > 8) {
@@ -295,7 +326,7 @@ internal fun MultiSendSheet(state: SwipeUiState, onSend: (Set<PlaylistId>) -> Un
                     value = query,
                     onValueChange = { query = it },
                     singleLine = true,
-                    placeholder = { Text("Buscar playlist") },
+                    placeholder = { Text(stringResource(R.string.multi_search)) },
                     leadingIcon = { Icon(AppIcons.Search, contentDescription = null) },
                     shape = CircleShape,
                     modifier = Modifier
@@ -304,10 +335,12 @@ internal fun MultiSendSheet(state: SwipeUiState, onSend: (Set<PlaylistId>) -> Un
                 )
             }
         }
+        val destinationsTitle = stringResource(R.string.multi_destinations)
+        val othersTitle = stringResource(R.string.multi_others)
         LazyColumn(Modifier.heightIn(max = 520.dp), contentPadding = PaddingValues(vertical = 8.dp)) {
             val shownDestinations = destinations.filter(::matches)
             if (shownDestinations.isNotEmpty()) {
-                item { SheetSection("Destinos del círculo") }
+                item { SheetSection(destinationsTitle) }
                 items(shownDestinations, key = { "d-${it.id.value}" }) { playlist ->
                     PickRow(playlist, slotOf[playlist.id], playlist.id in selected, isSuggested = playlist.id in suggested) {
                         selected = if (it) selected + playlist.id else selected - playlist.id
@@ -316,7 +349,7 @@ internal fun MultiSendSheet(state: SwipeUiState, onSend: (Set<PlaylistId>) -> Un
             }
             val shownOthers = others.filter(::matches)
             if (shownOthers.isNotEmpty()) {
-                item { SheetSection("Otras playlists") }
+                item { SheetSection(othersTitle) }
                 items(shownOthers, key = { "o-${it.id.value}" }) { playlist ->
                     PickRow(playlist, null, playlist.id in selected, isSuggested = false) {
                         selected = if (it) selected + playlist.id else selected - playlist.id
@@ -367,7 +400,7 @@ private fun PickRow(playlist: Playlist, slot: Slot?, checked: Boolean, isSuggest
         ) {
             Text(playlist.name, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
             if (isSuggested) {
-                Text("✦ Sugerida", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                Text(stringResource(R.string.multi_suggested), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
             }
         }
         Checkbox(checked = checked, onCheckedChange = null)

@@ -1,5 +1,8 @@
 package com.slidedify.feature.swipe
 
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
+import com.slidedify.core.domain.suggest.Reason
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -59,20 +62,22 @@ internal fun SuggestionBar(suggestion: SlotSuggestion?, onAccept: () -> Unit, mo
         ) { current ->
             if (current == null) {
                 Text(
-                    "✦ Sin sugerencia clara para esta canción",
+                    stringResource(R.string.suggest_none),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                     modifier = Modifier.padding(horizontal = 8.dp),
                 )
             } else {
                 val color = current.slot.color()
+                val reasons = current.reasons.map { reasonText(it) }
+                val description = stringResource(R.string.suggest_a11y, current.label, reasons.joinToString(". "))
                 Surface(
                     onClick = { showWhy = true },
                     shape = CircleShape,
                     color = color.copy(alpha = 0.14f),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .semantics { contentDescription = "Sugerido: ${current.label}. ${current.reasons.joinToString(". ")}. Tocá para ver por qué" },
+                        .semantics { contentDescription = description },
                 ) {
                     Row(Modifier.padding(start = 12.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                         Icon(AppIcons.Sparkle, contentDescription = null, tint = color, modifier = Modifier.size(18.dp))
@@ -82,13 +87,13 @@ internal fun SuggestionBar(suggestion: SlotSuggestion?, onAccept: () -> Unit, mo
                                 .weight(1f),
                         ) {
                             Text(
-                                "Sugerido: ${current.label}",
+                                stringResource(R.string.suggest_label, current.label),
                                 style = MaterialTheme.typography.labelLarge,
                                 fontWeight = FontWeight.Bold,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                             )
-                            current.reasons.firstOrNull()?.let {
+                            reasons.firstOrNull()?.let {
                                 Text(
                                     it,
                                     style = MaterialTheme.typography.labelSmall,
@@ -98,7 +103,7 @@ internal fun SuggestionBar(suggestion: SlotSuggestion?, onAccept: () -> Unit, mo
                                 )
                             }
                         }
-                        FilledTonalButton(onClick = onAccept, modifier = Modifier.height(36.dp)) { Text("Enviar") }
+                        FilledTonalButton(onClick = onAccept, modifier = Modifier.height(36.dp)) { Text(stringResource(R.string.suggest_send)) }
                     }
                 }
                 if (showWhy) {
@@ -114,10 +119,11 @@ private fun WhyDialog(suggestion: SlotSuggestion, onAccept: () -> Unit, onDismis
     AlertDialog(
         onDismissRequest = onDismiss,
         icon = { Icon(AppIcons.Sparkle, contentDescription = null, tint = suggestion.slot.color()) },
-        title = { Text("¿Por qué ${suggestion.label}?") },
+        title = { Text(stringResource(R.string.suggest_why, suggestion.label)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                suggestion.reasons.forEach { reason ->
+                suggestion.reasons.forEach { reasonData ->
+                    val reason = reasonText(reasonData)
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(
                             Modifier
@@ -129,14 +135,33 @@ private fun WhyDialog(suggestion: SlotSuggestion, onAccept: () -> Unit, onDismis
                     }
                 }
                 Text(
-                    "La sugerencia mejora con cada canción que ordenás. Podés apagarla en Ajustes.",
+                    stringResource(R.string.suggest_why_footer),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 4.dp),
                 )
             }
         },
-        confirmButton = { TextButton(onClick = onAccept) { Text("Enviar a ${suggestion.label}") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cerrar") } },
+        confirmButton = { TextButton(onClick = onAccept) { Text(stringResource(R.string.suggest_send_to, suggestion.label)) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.suggest_close)) } },
     )
+}
+
+/** A reason, worded in the user's language. */
+@Composable
+internal fun reasonText(reason: Reason): String = when (reason) {
+    is Reason.SameArtist -> pluralStringResource(R.plurals.reason_same_artist, reason.count, reason.count, reason.artist)
+    is Reason.SameMood -> {
+        val mood = stringResource(
+            when (reason.mood) {
+                Reason.Mood.Calm -> R.string.reason_calm
+                Reason.Mood.Energetic -> R.string.reason_energetic
+                Reason.Mood.Similar -> R.string.reason_similar_energy
+            },
+        )
+        if (reason.fromName) stringResource(R.string.reason_mood_name, mood, reason.playlist) else stringResource(R.string.reason_mood_playlist, mood)
+    }
+    is Reason.SimilarStyle -> stringResource(R.string.reason_style, reason.tags.joinToString(", "))
+    is Reason.MatchesName -> stringResource(R.string.reason_name, reason.playlist)
+    is Reason.SimilarTempo -> stringResource(R.string.reason_tempo, reason.bpm)
 }

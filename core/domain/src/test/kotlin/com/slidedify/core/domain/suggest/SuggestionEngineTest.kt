@@ -53,7 +53,7 @@ class SuggestionEngineTest {
         val other = PlaylistProfile(playlist("Otras")).withArtists(listOf(track("x", artist = "Nobody")))
         val suggestion = assertNotNull(SuggestionEngine.suggest(track("New", artist = "Soda"), null, listOf(listOf(other), listOf(withArtist))))
         assertEquals(1, suggestion.slotIndex)
-        assertTrue(suggestion.reasons.first().contains("Soda"))
+        assertEquals("Soda", (suggestion.reasons.first() as Reason.SameArtist).artist)
     }
 
     @Test

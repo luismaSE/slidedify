@@ -83,17 +83,33 @@ data class PlaylistProfile(
     }
 }
 
+/** Why a playlist fits a song. Data, not text: each screen words it in the user's language. */
+sealed interface Reason {
+    data class SameArtist(val artist: String, val count: Int) : Reason
+
+    enum class Mood { Calm, Energetic, Similar }
+
+    /** [fromName]: the playlist has no analysed songs yet, so its name set the expectation. */
+    data class SameMood(val mood: Mood, val playlist: String, val fromName: Boolean) : Reason
+
+    data class SimilarStyle(val tags: List<String>) : Reason
+
+    data class MatchesName(val playlist: String) : Reason
+
+    data class SimilarTempo(val bpm: Int) : Reason
+}
+
 /** A guess for the current song: which slot of the gesture circle, how sure, and why. */
 data class Suggestion(
     val slotIndex: Int,
     val score: Float,
     val playlists: List<Playlist>,
-    val reasons: List<String>,
+    val reasons: List<Reason>,
 )
 
 private enum class Signal(val weight: Float) { Artist(0.4f), Energy(0.3f), Tags(0.25f), Name(0.15f), Tempo(0.05f) }
 
-private data class Evidence(val value: Float, val reason: String? = null)
+private data class Evidence(val value: Float, val reason: Reason? = null)
 
 /**
  * Scores how well a song fits each playlist and proposes the best slot. Only suggests when one
@@ -155,8 +171,7 @@ object SuggestionEngine {
         val (artist, count) = hits.maxBy { it.second }
         val total = hits.sumOf { it.second }
         val value = 0.55f + 0.45f * (1f - exp(-total / 3f))
-        val reason = if (count == 1) "Ya tenés una de ${artist.name} acá" else "Ya tenés $count de ${artist.name} acá"
-        return Evidence(value, reason)
+        return Evidence(value, Reason.SameArtist(artist.name, count))
     }
 
     private fun energy(features: TrackFeatures, profile: PlaylistProfile): Evidence? {
@@ -170,11 +185,11 @@ object SuggestionEngine {
             null
         } else {
             val mood = when {
-                songEnergy < 0.4f -> "Suena tranquila"
-                songEnergy > 0.65f -> "Tiene mucha energía"
-                else -> "Energía parecida"
+                songEnergy < 0.4f -> Reason.Mood.Calm
+                songEnergy > 0.65f -> Reason.Mood.Energetic
+                else -> Reason.Mood.Similar
             }
-            if (learnt == null) "$mood, como pide «${profile.playlist.name}»" else "$mood, como el resto de la playlist"
+            Reason.SameMood(mood, profile.playlist.name, fromName = learnt == null)
         }
         return Evidence(value, reason)
     }
@@ -187,7 +202,7 @@ object SuggestionEngine {
         val shared = features.tags.keys.filter { it in mine }
             .sortedByDescending { (features.tags[it] ?: 0f) * (mine[it] ?: 0f) }
             .take(3)
-        val reason = if (value >= 0.3f && shared.isNotEmpty()) "Estilo parecido: ${shared.joinToString(", ")}" else null
+        val reason = if (value >= 0.3f && shared.isNotEmpty()) Reason.SimilarStyle(shared) else null
         return Evidence(value, reason)
     }
 
@@ -195,7 +210,7 @@ object SuggestionEngine {
         val prior = profile.name ?: return null
         if (prior.tags.isEmpty() || features.tags.isEmpty()) return null
         val overlap = prior.tags.sumOf { (features.tags[it] ?: 0f).toDouble() }.toFloat().coerceAtMost(1f)
-        val reason = if (overlap >= 0.3f) "Encaja con el nombre «${profile.playlist.name}»" else null
+        val reason = if (overlap >= 0.3f) Reason.MatchesName(profile.playlist.name) else null
         return Evidence(overlap, reason)
     }
 
@@ -206,7 +221,7 @@ object SuggestionEngine {
         // Half and double tempo count as close: trackers often disagree by a factor of two.
         val d = listOf(bpm / target, bpm * 2 / target, bpm / (target * 2)).minOf { abs(ln(it.toDouble())) }.toFloat()
         val value = exp(-(d * d) / (2 * 0.12f * 0.12f))
-        return Evidence(value, if (value > 0.8f) "Ritmo parecido (~${bpm.toInt()} BPM)" else null)
+        return Evidence(value, if (value > 0.8f) Reason.SimilarTempo(bpm.toInt()) else null)
     }
 
     private fun cosine(a: Map<String, Float>, b: Map<String, Float>): Float {

@@ -136,7 +136,7 @@ class PlaylistTransfer(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            emit(TransferProgress.Failed(e.message ?: "Error inesperado"))
+            emit(TransferProgress.Failed(e.message.orEmpty()))
         }
     }
 

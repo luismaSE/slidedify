@@ -1,5 +1,6 @@
 package com.slidedify.feature.swipe
 
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.Canvas
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -59,6 +60,7 @@ fun WheelOverlay(
     suggested: Slot? = null,
 ) {
     val textMeasurer = rememberTextMeasurer()
+    val pushLabel = stringResource(R.string.wheel_push)
     val half = layout.sectorWidth / 2f
     val segments = targets.map { target ->
         Segment(
@@ -70,8 +72,8 @@ fun WheelOverlay(
             selected = target.slot in wheel.selected,
         )
     } + listOf(
-        Segment(Sector.Skip, layout.wheelSkipCenter, half / 2f, SkipColor, "Omitir", false),
-        Segment(Sector.Cancel, layout.wheelCancelCenter, half / 2f, CancelColor, "Cancelar", false),
+        Segment(Sector.Skip, layout.wheelSkipCenter, half / 2f, SkipColor, stringResource(R.string.swipe_skip), false),
+        Segment(Sector.Cancel, layout.wheelCancelCenter, half / 2f, CancelColor, stringResource(R.string.swipe_cancel), false),
     )
 
     Canvas(modifier) {
@@ -131,7 +133,7 @@ fun WheelOverlay(
         }
 
         val count = wheel.selected.size
-        drawLabel(textMeasurer, if (count == 0) "empujá" else "✓ $count", center, 0f, 0f, emphasized = false, halfWidth = 90f)
+        drawLabel(textMeasurer, if (count == 0) pushLabel else "✓ $count", center, 0f, 0f, emphasized = false, halfWidth = 90f)
 
         // Finger position, relative to the drawn centre.
         val finger = center + Offset(wheel.current.x - wheel.origin.x, wheel.current.y - wheel.origin.y)

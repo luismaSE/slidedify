@@ -20,6 +20,7 @@ import com.slidedify.core.domain.settings.RecentSource
 import com.slidedify.core.domain.settings.SettingsRepository
 import com.slidedify.core.domain.settings.SortSettings
 import com.slidedify.core.domain.suggest.PlaylistProfile
+import com.slidedify.core.domain.suggest.Reason
 import com.slidedify.core.domain.suggest.Suggester
 import com.slidedify.core.domain.suggest.SuggestionEngine
 import com.slidedify.core.domain.suggest.TrackFeatures
@@ -55,7 +56,7 @@ data class SlotTarget(val slot: Slot, val playlists: List<Playlist>) {
 }
 
 /** A guessed destination for the current song, with the reasons to show. */
-data class SlotSuggestion(val slot: Slot, val trackId: TrackId, val label: String, val reasons: List<String>)
+data class SlotSuggestion(val slot: Slot, val trackId: TrackId, val label: String, val reasons: List<Reason>)
 
 /** Steps of the first-run tutorial; each one completes when the user performs the gesture. */
 enum class TutorialStep { Swipe, Wheel, DoubleTap }
@@ -115,7 +116,7 @@ sealed interface SwipeEvent {
 
     data object DestinationsFull : SwipeEvent
 
-    data class Error(val message: String) : SwipeEvent
+    data object CreatePlaylistFailed : SwipeEvent
 }
 
 /** Navigation arguments, read from [SavedStateHandle] so this module does not depend on the app's routes. */
@@ -152,7 +153,7 @@ class SwipeViewModel @Inject constructor(
     private val provider: MusicProvider = registry.active.value
     private val player = provider.player
     private val source = SwipeArgs.sourceFrom(savedStateHandle)
-    private val sourceName = savedStateHandle.get<String>(SwipeArgs.TITLE) ?: "Me gusta"
+    private val sourceName = savedStateHandle.get<String>(SwipeArgs.TITLE).orEmpty()
 
     private val session = MutableStateFlow<SortSession?>(null)
     private val playlists = MutableStateFlow<List<Playlist>>(emptyList())
@@ -374,7 +375,8 @@ class SwipeViewModel @Inject constructor(
                 throw e
             } catch (e: Exception) {
                 if (session.value == null) {
-                    loadState.value = LoadState(error = "No se pudieron cargar las canciones (${e.message})")
+                    // The screen words it; this is only the technical detail.
+                    loadState.value = LoadState(error = e.message.orEmpty())
                 } else {
                     // Keep what was loaded; the user can keep sorting.
                     loadState.value = loadState.value.copy(loadingMore = false)
@@ -459,7 +461,7 @@ class SwipeViewModel @Inject constructor(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                _events.trySend(SwipeEvent.Error("No se pudo crear la playlist"))
+                _events.trySend(SwipeEvent.CreatePlaylistFailed)
                 return@launch
             }
             playlists.value = playlists.value + created

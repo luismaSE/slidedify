@@ -6,16 +6,16 @@ import java.text.Collator
 import java.util.Locale
 
 /** How the song list can be ordered. [defaultDescending] is the natural direction when picked. */
-enum class TrackOrder(val label: String, val defaultDescending: Boolean = false) {
-    Source("Orden de la lista"),
-    Added("Agregadas", defaultDescending = true),
-    Title("Título"),
-    Artist("Artista"),
-    Album("Álbum"),
-    Duration("Duración"),
+enum class TrackOrder(val defaultDescending: Boolean = false) {
+    Source,
+    Added(defaultDescending = true),
+    Title,
+    Artist,
+    Album,
+    Duration,
 }
 
-enum class TrackFilter(val label: String) { All("Todas"), Pending("Pendientes"), Reviewed("Revisadas") }
+enum class TrackFilter { All, Pending, Reviewed }
 
 data class TrackListOptions(
     val order: TrackOrder = TrackOrder.Source,
@@ -36,7 +36,8 @@ fun availableOrders(queue: List<Track>): List<TrackOrder> =
  * the sorted-by value (no date) go last in both directions.
  */
 fun trackComparator(order: TrackOrder, descending: Boolean, position: (Track) -> Int): Comparator<Track> {
-    val collator = Collator.getInstance(Locale("es")).apply { strength = Collator.PRIMARY }
+    // Accent- and case-insensitive, in the phone's language.
+    val collator = Collator.getInstance(Locale.getDefault()).apply { strength = Collator.PRIMARY }
     val text = compareBy<String, String>(collator) { it }
     val base: Comparator<Track> = when (order) {
         TrackOrder.Source -> compareBy(position)

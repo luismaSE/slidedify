@@ -28,7 +28,9 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.annotation.StringRes
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.stringResource
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -72,11 +74,11 @@ object DestinationsDestination
 data class SwipeDestination(val kind: String, val playlistId: String? = null, val title: String)
 
 /** The four sections of the bottom bar. */
-private enum class Tab(val route: Any, val routeClass: KClass<*>, val label: String, val icon: ImageVector) {
-    Home(HomeDestination, HomeDestination::class, "Inicio", AppIcons.Home),
-    Transfer(TransferDestination, TransferDestination::class, "Transferir", AppIcons.Swap),
-    Connections(ConnectionsDestination, ConnectionsDestination::class, "Conexiones", AppIcons.Link),
-    Settings(SettingsDestination, SettingsDestination::class, "Ajustes", AppIcons.Settings),
+private enum class Tab(val route: Any, val routeClass: KClass<*>, @StringRes val label: Int, val icon: ImageVector) {
+    Home(HomeDestination, HomeDestination::class, R.string.tab_home, AppIcons.Home),
+    Transfer(TransferDestination, TransferDestination::class, R.string.tab_transfer, AppIcons.Swap),
+    Connections(ConnectionsDestination, ConnectionsDestination::class, R.string.tab_connections, AppIcons.Link),
+    Settings(SettingsDestination, SettingsDestination::class, R.string.tab_settings, AppIcons.Settings),
 }
 
 private fun NavDestination?.isTab(tab: Tab) = this?.hierarchy?.any { it.hasRoute(tab.routeClass) } == true
@@ -106,7 +108,7 @@ fun SlidedifyNavHost() {
                             selected = destination.isTab(tab),
                             onClick = { navController.openTab(tab) },
                             icon = { Icon(tab.icon, contentDescription = null) },
-                            label = { Text(tab.label) },
+                            label = { Text(stringResource(tab.label)) },
                             colors = NavigationBarItemDefaults.colors(
                                 indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.18f),
                                 selectedIconColor = MaterialTheme.colorScheme.primary,
@@ -126,7 +128,7 @@ fun SlidedifyNavHost() {
                         selected = destination.isTab(tab),
                         onClick = { navController.openTab(tab) },
                         icon = { Icon(tab.icon, contentDescription = null) },
-                        label = { Text(tab.label) },
+                        label = { Text(stringResource(tab.label)) },
                         colors = NavigationRailItemDefaults.colors(
                             indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.18f),
                             selectedIconColor = MaterialTheme.colorScheme.primary,

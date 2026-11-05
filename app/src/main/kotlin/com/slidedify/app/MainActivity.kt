@@ -33,6 +33,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import com.slidedify.core.designsystem.SlidedifyTheme
@@ -83,13 +84,15 @@ private fun LastCrashDialog(report: String) {
     val context = LocalContext.current
     var visible by remember { mutableStateOf(true) }
     if (!visible) return
+    val copied = stringResource(R.string.crash_copied)
+    val sendWith = stringResource(R.string.crash_send_with)
     val close = {
         CrashReport.clear(context)
         visible = false
     }
     AlertDialog(
         onDismissRequest = close,
-        title = { Text("Compass se cerró la última vez") },
+        title = { Text(stringResource(R.string.crash_title)) },
         text = {
             Text(
                 report,
@@ -105,8 +108,8 @@ private fun LastCrashDialog(report: String) {
                 TextButton(onClick = {
                     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                     clipboard.setPrimaryClip(ClipData.newPlainText("Error de Compass", report))
-                    Toast.makeText(context, "Error copiado", Toast.LENGTH_SHORT).show()
-                }) { Text("Copiar") }
+                    Toast.makeText(context, copied, Toast.LENGTH_SHORT).show()
+                }) { Text(stringResource(R.string.crash_copy)) }
                 TextButton(onClick = {
                     // Any app the user has: WhatsApp, mail, notes...
                     val send = Intent(Intent.ACTION_SEND).apply {
@@ -114,9 +117,9 @@ private fun LastCrashDialog(report: String) {
                         putExtra(Intent.EXTRA_SUBJECT, "Error de Compass")
                         putExtra(Intent.EXTRA_TEXT, report)
                     }
-                    runCatching { context.startActivity(Intent.createChooser(send, "Enviar el error")) }
+                    runCatching { context.startActivity(Intent.createChooser(send, sendWith)) }
                     close()
-                }) { Text("Enviar") }
+                }) { Text(stringResource(R.string.crash_send)) }
             }
         },
         dismissButton = {
@@ -124,8 +127,8 @@ private fun LastCrashDialog(report: String) {
                 TextButton(onClick = {
                     runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(issueUrl(report)))) }
                     close()
-                }) { Text("GitHub") }
-                TextButton(onClick = close) { Text("Cerrar") }
+                }) { Text(stringResource(R.string.crash_github)) }
+                TextButton(onClick = close) { Text(stringResource(R.string.crash_close)) }
             }
         },
     )
