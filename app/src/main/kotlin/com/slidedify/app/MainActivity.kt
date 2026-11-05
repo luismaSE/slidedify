@@ -16,6 +16,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import com.slidedify.core.domain.settings.SettingsRepository
 import com.slidedify.core.domain.settings.ThemeMode
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import androidx.compose.foundation.layout.Row
@@ -48,7 +49,8 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         val lastCrash = CrashReport.read(this)
         setContent {
-            val mode = settingsRepository.settings.map { it.theme }.collectAsState(initial = ThemeMode.Dark).value
+            val themeFlow = remember { settingsRepository.settings.map { it.theme }.distinctUntilChanged() }
+            val mode = themeFlow.collectAsState(initial = ThemeMode.Dark).value
             val dark = when (mode) {
                 ThemeMode.Dark -> true
                 ThemeMode.Light -> false
