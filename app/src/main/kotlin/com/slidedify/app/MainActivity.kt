@@ -9,7 +9,15 @@ import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.SystemBarStyle
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import com.slidedify.core.domain.settings.SettingsRepository
+import com.slidedify.core.domain.settings.ThemeMode
+import kotlinx.coroutines.flow.map
+import javax.inject.Inject
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.rememberScrollState
@@ -32,12 +40,29 @@ import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+    @Inject lateinit var settingsRepository: SettingsRepository
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         val lastCrash = CrashReport.read(this)
         setContent {
-            SlidedifyTheme {
+            val mode = settingsRepository.settings.map { it.theme }.collectAsState(initial = ThemeMode.Dark).value
+            val dark = when (mode) {
+                ThemeMode.Dark -> true
+                ThemeMode.Light -> false
+                ThemeMode.System -> isSystemInDarkTheme()
+            }
+            // Status and navigation bar icons follow the app's theme, not only the system's.
+            LaunchedEffect(dark) {
+                val style = if (dark) {
+                    SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
+                } else {
+                    SystemBarStyle.light(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT)
+                }
+                enableEdgeToEdge(statusBarStyle = style, navigationBarStyle = style)
+            }
+            SlidedifyTheme(darkTheme = dark) {
                 SlidedifyNavHost()
                 if (lastCrash != null) LastCrashDialog(lastCrash)
             }

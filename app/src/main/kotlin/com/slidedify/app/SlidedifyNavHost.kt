@@ -7,6 +7,18 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.material3.NavigationRail
+import androidx.compose.material3.NavigationRailItem
+import androidx.compose.material3.NavigationRailItemDefaults
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Icon
@@ -75,6 +87,8 @@ fun SlidedifyNavHost() {
     val entry by navController.currentBackStackEntryAsState()
     val destination = entry?.destination
     val showBar = Tab.entries.any { destination.isTab(it) }
+    // Wide windows (landscape, tablets): a rail on the side instead of the bottom bar.
+    val wide = LocalConfiguration.current.screenWidthDp >= 600
 
     Scaffold(
         // Each screen handles the status bar itself; this only reserves room for the bar.
@@ -82,7 +96,7 @@ fun SlidedifyNavHost() {
         containerColor = MaterialTheme.colorScheme.background,
         bottomBar = {
             AnimatedVisibility(
-                visible = showBar,
+                visible = showBar && !wide,
                 enter = slideInVertically { it } + fadeIn(),
                 exit = slideOutVertically { it } + fadeOut(),
             ) {
@@ -104,39 +118,58 @@ fun SlidedifyNavHost() {
             }
         },
     ) { padding ->
+      Row(Modifier.padding(padding)) {
+        if (wide && showBar) {
+            NavigationRail(containerColor = MaterialTheme.colorScheme.surfaceContainerLow, modifier = Modifier.safeDrawingPadding()) {
+                Tab.entries.forEach { tab ->
+                    NavigationRailItem(
+                        selected = destination.isTab(tab),
+                        onClick = { navController.openTab(tab) },
+                        icon = { Icon(tab.icon, contentDescription = null) },
+                        label = { Text(tab.label) },
+                        colors = NavigationRailItemDefaults.colors(
+                            indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.18f),
+                            selectedIconColor = MaterialTheme.colorScheme.primary,
+                        ),
+                    )
+                }
+            }
+        }
         NavHost(
             navController,
             startDestination = HomeDestination,
-            modifier = Modifier.padding(padding),
+            modifier = Modifier.weight(1f),
             enterTransition = { fadeIn() },
             exitTransition = { fadeOut() },
         ) {
             composable<HomeDestination> {
-                HomeRoute(
+                Readable { HomeRoute(
                     onOpenSource = { source, title ->
                         val playlistId = (source as? TrackSource.FromPlaylist)?.id?.value
                         navController.navigate(SwipeDestination(source.kind.name, playlistId, title))
                     },
                     onOpenConnections = { navController.openTab(Tab.Connections) },
-                )
+                ) }
             }
             composable<TransferDestination> {
-                TransferRoute(onOpenConnections = { navController.openTab(Tab.Connections) })
+                Readable { TransferRoute(onOpenConnections = { navController.openTab(Tab.Connections) }) }
             }
             composable<ConnectionsDestination> {
-                ConnectionsRoute()
+                Readable { ConnectionsRoute() }
             }
             composable<SettingsDestination> {
-                SettingsRoute(
-                    onOpenDestinations = { navController.navigate(DestinationsDestination) },
-                    onOpenConnections = { navController.openTab(Tab.Connections) },
-                )
+                Readable {
+                    SettingsRoute(
+                        onOpenDestinations = { navController.navigate(DestinationsDestination) },
+                        onOpenConnections = { navController.openTab(Tab.Connections) },
+                    )
+                }
             }
             composable<DestinationsDestination>(
                 enterTransition = { slideInHorizontally { it } },
                 popExitTransition = { slideOutHorizontally { it } },
             ) {
-                DestinationsRoute(onBack = { navController.popBackStack() })
+                Readable { DestinationsRoute(onBack = { navController.popBackStack() }) }
             }
             composable<SwipeDestination>(
                 enterTransition = { slideInVertically { it / 6 } + fadeIn() },
@@ -148,6 +181,15 @@ fun SlidedifyNavHost() {
                 )
             }
         }
+      }
+    }
+}
+
+/** Keeps lists and settings at a readable width on tablets, centred. */
+@Composable
+private fun Readable(content: @Composable () -> Unit) {
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+        Box(Modifier.fillMaxHeight().widthIn(max = 720.dp)) { content() }
     }
 }
 

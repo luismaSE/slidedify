@@ -12,6 +12,7 @@ import com.slidedify.core.domain.settings.ButtonMode
 import com.slidedify.core.domain.settings.RecentSource
 import com.slidedify.core.domain.settings.SettingsRepository
 import com.slidedify.core.domain.settings.SortSettings
+import com.slidedify.core.domain.settings.ThemeMode
 import com.slidedify.core.model.GestureMap
 import com.slidedify.core.model.PlaylistId
 import com.slidedify.core.model.ProviderId
@@ -43,6 +44,7 @@ internal data class StoredSettings(
     val suggestions: Boolean = true,
     val moveFromSource: Boolean = false,
     val audioAnalysis: String = AudioAnalysis.WifiOnly.name,
+    val theme: String = ThemeMode.Dark.name,
     val recent: List<StoredRecent> = emptyList(),
     val lastProvider: String? = null,
     val queueOrders: Map<String, String> = emptyMap(),
@@ -100,6 +102,7 @@ internal object SettingsMapper {
         suggestions = stored.suggestions,
         moveFromSource = stored.moveFromSource,
         audioAnalysis = AudioAnalysis.entries.firstOrNull { it.name == stored.audioAnalysis } ?: AudioAnalysis.WifiOnly,
+        theme = ThemeMode.entries.firstOrNull { it.name == stored.theme } ?: ThemeMode.Dark,
         recent = stored.recent.mapNotNull { it.toDomain() },
         lastProvider = stored.lastProvider?.let(::ProviderId),
         queueOrders = stored.queueOrders,
@@ -118,6 +121,7 @@ internal object SettingsMapper {
         suggestions = settings.suggestions,
         moveFromSource = settings.moveFromSource,
         audioAnalysis = settings.audioAnalysis.name,
+        theme = settings.theme.name,
         recent = settings.recent.map { it.toStored() },
         lastProvider = settings.lastProvider?.value,
         queueOrders = settings.queueOrders,

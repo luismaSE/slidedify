@@ -90,7 +90,7 @@ fun CoverArt(
 /** Brand-ish colour of a music service, for its avatar. */
 fun providerColor(providerId: String): Color = when (providerId) {
     "spotify" -> Color(0xFF1ED760)
-    "tidal" -> Color(0xFFE6E7EB)
+    "tidal" -> Color(0xFF9AA3B2)
     "youtube" -> Color(0xFFFF3B3B)
     else -> Color(0xFFC792EA)
 }

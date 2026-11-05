@@ -19,6 +19,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -216,21 +218,50 @@ fun SwipeScreen(state: SwipeUiState, actions: SwipeActions, notice: String? = nu
                 state.isFinished -> FinishedMessage(actions, Modifier.fillMaxSize())
                 else -> {
                     val track = state.current ?: return@Column
-                    if (state.settings.suggestions) SuggestionBar(state.suggestion, actions.onAcceptSuggestion)
-                    if (buttonMode) {
-                        Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                            TrackCard(track, state, actions, Modifier.fillMaxSize().padding(CardInset), onCoverColor = { coverColor = it })
+                    BoxWithConstraints(
+                        Modifier
+                            .weight(1f)
+                            .fillMaxWidth(),
+                        contentAlignment = Alignment.TopCenter,
+                    ) {
+                        // Landscape (or a wide tablet): card on the left, controls on the right.
+                        val wide = maxWidth > maxHeight && maxWidth >= 560.dp
+                        val cardArea: @Composable (Modifier) -> Unit = { areaModifier ->
+                            Column(areaModifier) {
+                                if (state.settings.suggestions) SuggestionBar(state.suggestion, actions.onAcceptSuggestion)
+                                if (buttonMode) {
+                                    Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                                        TrackCard(track, state, actions, Modifier.fillMaxSize().padding(CardInset), onCoverColor = { coverColor = it })
+                                    }
+                                    ButtonPanel(track, state, actions)
+                                } else {
+                                    GestureArea(state, track, actions, Modifier.weight(1f).fillMaxWidth(), onCoverColor = { coverColor = it })
+                                }
+                            }
                         }
-                        ButtonPanel(track, state, actions)
-                    } else {
-                        GestureArea(state, track, actions, Modifier.weight(1f).fillMaxWidth(), onCoverColor = { coverColor = it })
+                        val controls: @Composable (Modifier) -> Unit = { controlsModifier ->
+                            Box(controlsModifier, contentAlignment = Alignment.Center) {
+                                BottomBar(
+                                    state,
+                                    actions,
+                                    onAddDestination = { showAddDestination = true },
+                                    onMultiSend = { showMultiSend = true },
+                                )
+                            }
+                        }
+                        if (wide) {
+                            Row(Modifier.fillMaxSize()) {
+                                cardArea(Modifier.weight(1.5f).fillMaxHeight())
+                                controls(Modifier.weight(1f).fillMaxHeight())
+                            }
+                        } else {
+                            // On tablets in portrait the card doesn't stretch to the whole width.
+                            Column(Modifier.fillMaxHeight().widthIn(max = 640.dp)) {
+                                cardArea(Modifier.weight(1f).fillMaxWidth())
+                                controls(Modifier.fillMaxWidth())
+                            }
+                        }
                     }
-                    BottomBar(
-                        state,
-                        actions,
-                        onAddDestination = { showAddDestination = true },
-                        onMultiSend = { showMultiSend = true },
-                    )
                 }
             }
         }

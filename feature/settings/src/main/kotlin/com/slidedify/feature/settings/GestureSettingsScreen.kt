@@ -78,6 +78,7 @@ import com.slidedify.core.domain.settings.AudioAnalysis
 import com.slidedify.core.domain.settings.ButtonMode
 import com.slidedify.core.domain.settings.SettingsRepository
 import com.slidedify.core.domain.settings.SortSettings
+import com.slidedify.core.domain.settings.ThemeMode
 import com.slidedify.core.model.GestureMap
 import com.slidedify.core.model.Playlist
 import com.slidedify.core.model.PlaylistId
@@ -164,6 +165,8 @@ class GestureSettingsViewModel @Inject constructor(
 
     fun setAudioAnalysis(value: AudioAnalysis) = update { it.copy(audioAnalysis = value) }
 
+    fun setTheme(value: ThemeMode) = update { it.copy(theme = value) }
+
     fun setHoldTimeout(ms: Long) = update { it.withHoldTimeout(ms) }
 
     fun setButtonMode(mode: ButtonMode) = update { it.copy(buttonMode = mode) }
@@ -195,6 +198,7 @@ fun SettingsRoute(
         onSuggestions = viewModel::setSuggestions,
         onMoveFromSource = viewModel::setMoveFromSource,
         onAudioAnalysis = viewModel::setAudioAnalysis,
+        onTheme = viewModel::setTheme,
         onHoldTimeout = viewModel::setHoldTimeout,
         onButtonMode = viewModel::setButtonMode,
         onReplayTutorial = viewModel::replayTutorial,
@@ -213,6 +217,7 @@ fun SettingsScreen(
     onSuggestions: (Boolean) -> Unit,
     onMoveFromSource: (Boolean) -> Unit,
     onAudioAnalysis: (AudioAnalysis) -> Unit,
+    onTheme: (ThemeMode) -> Unit,
     onHoldTimeout: (Long) -> Unit,
     onButtonMode: (ButtonMode) -> Unit,
     onReplayTutorial: () -> Unit,
@@ -356,6 +361,26 @@ fun SettingsScreen(
                         tutorialQueued = true
                         onReplayTutorial()
                     }
+                }
+            }
+
+            item {
+                SettingsGroup("Apariencia") {
+                    ChoiceRow(
+                        icon = AppIcons.Tune,
+                        title = "Tema",
+                        subtitle = "Oscuro, claro o el mismo que el teléfono",
+                        options = listOf(ThemeMode.Dark, ThemeMode.Light, ThemeMode.System),
+                        selected = settings.theme,
+                        label = {
+                            when (it) {
+                                ThemeMode.Dark -> "Oscuro"
+                                ThemeMode.Light -> "Claro"
+                                ThemeMode.System -> "Sistema"
+                            }
+                        },
+                        onSelect = onTheme,
+                    )
                 }
             }
 
