@@ -39,6 +39,8 @@ data class SourceCard(
     val sorted: Int = 0,
     /** When it was last opened, or null if never. */
     val openedAt: Long? = null,
+    /** A playlist the user follows but doesn't own (can be sorted, songs can't be removed from it). */
+    val followed: Boolean = false,
 ) {
     val progress: Float? get() = total?.takeIf { it > 0 }?.let { sorted.toFloat() / it }
     val isDone: Boolean get() = total != null && total > 0 && sorted >= total
@@ -111,7 +113,7 @@ class HomeViewModel @Inject constructor(
                 emit(LibraryLoad.Loading)
                 val result = try {
                     LibraryLoad.Loaded(
-                        if (TrackSource.Kind.Playlist in provider.capabilities.sources) provider.playlists.writablePlaylists() else emptyList(),
+                        if (TrackSource.Kind.Playlist in provider.capabilities.sources) provider.playlists.allPlaylists() else emptyList(),
                     )
                 } catch (e: CancellationException) {
                     throw e
@@ -144,7 +146,7 @@ class HomeViewModel @Inject constructor(
         val playlists = (load as? LibraryLoad.Loaded)?.playlists.orEmpty()
         val playlistsById = playlists.associateBy { it.id }
 
-        fun card(source: TrackSource, title: String, imageUrl: String? = null, total: Int? = null): SourceCard {
+        fun card(source: TrackSource, title: String, imageUrl: String? = null, total: Int? = null, followed: Boolean = false): SourceCard {
             val seen = recentByKey[source.key]
             return SourceCard(
                 source = source,
@@ -153,6 +155,7 @@ class HomeViewModel @Inject constructor(
                 total = total ?: seen?.total,
                 sorted = counts[source.key] ?: 0,
                 openedAt = seen?.openedAt,
+                followed = followed,
             )
         }
 
@@ -161,7 +164,9 @@ class HomeViewModel @Inject constructor(
             if (TrackSource.Kind.LikedSongs in kinds) add(card(TrackSource.LikedSongs, LIKED))
             if (TrackSource.Kind.Recommended in kinds) add(card(TrackSource.Recommended, TOP))
         }
-        val playlistCards = playlists.map { card(TrackSource.FromPlaylist(it.id), it.name, it.imageUrl, it.trackCount) }
+        // Own playlists first, then followed ones.
+        val playlistCards = playlists.sortedBy { !it.canWrite }
+            .map { card(TrackSource.FromPlaylist(it.id), it.name, it.imageUrl, it.trackCount, followed = !it.canWrite) }
         // Recent entries use the live name and cover when the playlist still exists.
         val recentCards = recent.mapNotNull { entry ->
             when (val source = entry.source) {

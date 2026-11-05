@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.slidedify.core.domain.repository.TrackSource
+import com.slidedify.core.domain.settings.AudioAnalysis
 import com.slidedify.core.domain.settings.ButtonMode
 import com.slidedify.core.domain.settings.RecentSource
 import com.slidedify.core.domain.settings.SettingsRepository
@@ -40,6 +41,8 @@ internal data class StoredSettings(
     val buttonMode: String = ButtonMode.Auto.name,
     val tutorialCompleted: Boolean = false,
     val suggestions: Boolean = true,
+    val moveFromSource: Boolean = false,
+    val audioAnalysis: String = AudioAnalysis.WifiOnly.name,
     val recent: List<StoredRecent> = emptyList(),
     val lastProvider: String? = null,
     val queueOrders: Map<String, String> = emptyMap(),
@@ -95,6 +98,8 @@ internal object SettingsMapper {
         buttonMode = ButtonMode.entries.firstOrNull { it.name == stored.buttonMode } ?: ButtonMode.Auto,
         tutorialCompleted = stored.tutorialCompleted,
         suggestions = stored.suggestions,
+        moveFromSource = stored.moveFromSource,
+        audioAnalysis = AudioAnalysis.entries.firstOrNull { it.name == stored.audioAnalysis } ?: AudioAnalysis.WifiOnly,
         recent = stored.recent.mapNotNull { it.toDomain() },
         lastProvider = stored.lastProvider?.let(::ProviderId),
         queueOrders = stored.queueOrders,
@@ -111,6 +116,8 @@ internal object SettingsMapper {
         buttonMode = settings.buttonMode.name,
         tutorialCompleted = settings.tutorialCompleted,
         suggestions = settings.suggestions,
+        moveFromSource = settings.moveFromSource,
+        audioAnalysis = settings.audioAnalysis.name,
         recent = settings.recent.map { it.toStored() },
         lastProvider = settings.lastProvider?.value,
         queueOrders = settings.queueOrders,

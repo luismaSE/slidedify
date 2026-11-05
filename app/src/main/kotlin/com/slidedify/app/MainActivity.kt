@@ -3,11 +3,14 @@ package com.slidedify.app
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -42,6 +45,13 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+/** New GitHub issue with the report filled in (trimmed: URLs have a length limit). */
+private fun issueUrl(report: String): String {
+    val title = "Error: " + report.lineSequence().drop(2).firstOrNull().orEmpty().take(80)
+    val body = "```\n${report.take(3_500)}\n```"
+    return "https://github.com/luismaSE/slidedify/issues/new?title=${Uri.encode(title)}&body=${Uri.encode(body)}"
+}
+
 /** Shown once after a crash so the error can be copied and sent. */
 @Composable
 private fun LastCrashDialog(report: String) {
@@ -66,13 +76,32 @@ private fun LastCrashDialog(report: String) {
             )
         },
         confirmButton = {
-            TextButton(onClick = {
-                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                clipboard.setPrimaryClip(ClipData.newPlainText("Error de Compass", report))
-                Toast.makeText(context, "Error copiado", Toast.LENGTH_SHORT).show()
-                close()
-            }) { Text("Copiar error") }
+            Row {
+                TextButton(onClick = {
+                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                    clipboard.setPrimaryClip(ClipData.newPlainText("Error de Compass", report))
+                    Toast.makeText(context, "Error copiado", Toast.LENGTH_SHORT).show()
+                }) { Text("Copiar") }
+                TextButton(onClick = {
+                    // Any app the user has: WhatsApp, mail, notes...
+                    val send = Intent(Intent.ACTION_SEND).apply {
+                        type = "text/plain"
+                        putExtra(Intent.EXTRA_SUBJECT, "Error de Compass")
+                        putExtra(Intent.EXTRA_TEXT, report)
+                    }
+                    runCatching { context.startActivity(Intent.createChooser(send, "Enviar el error")) }
+                    close()
+                }) { Text("Enviar") }
+            }
         },
-        dismissButton = { TextButton(onClick = close) { Text("Cerrar") } },
+        dismissButton = {
+            Row {
+                TextButton(onClick = {
+                    runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(issueUrl(report)))) }
+                    close()
+                }) { Text("GitHub") }
+                TextButton(onClick = close) { Text("Cerrar") }
+            }
+        },
     )
 }

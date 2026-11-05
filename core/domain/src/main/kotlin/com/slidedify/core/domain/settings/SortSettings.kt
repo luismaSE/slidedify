@@ -7,6 +7,9 @@ import com.slidedify.core.domain.repository.key
 import com.slidedify.core.model.ProviderId
 import kotlinx.coroutines.flow.Flow
 
+/** When suggestions may download previews to listen to them (about 0.5 MB per song). */
+enum class AudioAnalysis { WifiOnly, Always, Off }
+
 enum class ButtonMode {
     /** On when a screen reader (TalkBack) is active. */
     Auto,
@@ -25,6 +28,9 @@ data class SortSettings(
     val tutorialCompleted: Boolean = false,
     /** Suggest a playlist for each song from its style. */
     val suggestions: Boolean = true,
+    val audioAnalysis: AudioAnalysis = AudioAnalysis.WifiOnly,
+    /** When sorting one of the user's playlists, take each song out of it once sent elsewhere ("mover"). */
+    val moveFromSource: Boolean = false,
     /** Sources opened lately, newest first (all providers mixed). */
     val recent: List<RecentSource> = emptyList(),
     /** Service the user picked last, restored on the next launch. */

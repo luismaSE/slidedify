@@ -86,16 +86,18 @@ class SpotifyTrackRepository(private val api: SpotifyWebApi) : TrackRepository {
 }
 
 class SpotifyPlaylistRepository(private val api: SpotifyWebApi) : PlaylistRepository {
-    override suspend fun writablePlaylists(): List<Playlist> {
+    override suspend fun writablePlaylists(): List<Playlist> = allPlaylists().filter { it.canWrite }
+
+    /** Own and collaborative playlists can be edited; followed ones only sorted. */
+    override suspend fun allPlaylists(): List<Playlist> {
         val me = api.me().id
-        return api.myPlaylists()
-            .filter { it.owner?.id == me || it.collaborative }
-            .map { it.toDomain() }
+        return api.myPlaylists().map { it.toDomain(canWrite = it.owner?.id == me || it.collaborative) }
     }
 
     override suspend fun createPlaylist(name: String): Playlist = api.createPlaylist(name).toDomain()
 
-    private fun PlaylistDto.toDomain() = Playlist(PlaylistId(id), SPOTIFY, name, images?.firstOrNull()?.url, trackCount)
+    private fun PlaylistDto.toDomain(canWrite: Boolean = true) =
+        Playlist(PlaylistId(id), SPOTIFY, name, images?.firstOrNull()?.url, trackCount, canWrite)
 }
 
 class SpotifyLibraryWriter(private val api: SpotifyWebApi) : LibraryWriter {

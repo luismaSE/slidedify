@@ -48,6 +48,8 @@ data class Playlist(
     val imageUrl: String? = null,
     /** Number of songs, when the service reports it (shown on the home screen). */
     val trackCount: Int? = null,
+    /** False for playlists the user follows but doesn't own: they can be sorted, not written to. */
+    val canWrite: Boolean = true,
 )
 
 /**

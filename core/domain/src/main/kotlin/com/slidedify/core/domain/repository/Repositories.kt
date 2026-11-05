@@ -81,6 +81,12 @@ interface PlaylistRepository {
     suspend fun writablePlaylists(): List<Playlist>
 
     /**
+     * Every playlist in the user's library, including followed ones they can't edit
+     * ([Playlist.canWrite] false). Those can be sorted (as a source) but are never destinations.
+     */
+    suspend fun allPlaylists(): List<Playlist> = writablePlaylists()
+
+    /**
      * Creates a playlist and returns it. Unlike track writes this is immediate (not queued),
      * because the new id is needed right away. Only called when `capabilities.canCreatePlaylists`.
      */

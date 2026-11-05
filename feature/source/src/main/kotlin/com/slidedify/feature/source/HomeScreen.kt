@@ -406,6 +406,7 @@ private fun PlaylistRow(card: SourceCard, isLast: Boolean, onClick: () -> Unit) 
                         modifier = Modifier.weight(1f, fill = false),
                     )
                     if (isLast) Tag("Última", Modifier.padding(start = 8.dp))
+                    if (card.followed) Tag("Seguida", Modifier.padding(start = 8.dp), color = MaterialTheme.colorScheme.secondary)
                 }
                 Text(
                     listOfNotNull(card.total?.let { "$it canciones" }, card.progressLabel(short = true)).joinToString(" · ").ifEmpty { "Playlist" },

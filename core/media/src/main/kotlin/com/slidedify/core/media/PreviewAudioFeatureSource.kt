@@ -22,11 +22,16 @@ import java.nio.ByteOrder
  * Listens to the 30-second preview on the phone (decodes it, nothing is uploaded) and measures
  * energy, brightness and tempo. Expensive: it downloads the clip, so it runs for few songs.
  */
-class PreviewAudioFeatureSource(private val previews: PreviewSource) : FeatureSource {
+class PreviewAudioFeatureSource(
+    private val previews: PreviewSource,
+    /** Whether downloading a preview is OK right now (setting + network); if not, it is retried later. */
+    private val isAllowed: suspend () -> Boolean = { true },
+) : FeatureSource {
     override val id = "audio"
     override val isExpensive = true
 
     override suspend fun features(track: Track): TrackFeatures? {
+        if (!isAllowed()) return null
         val url = previews.previewUrl(track) ?: return TrackFeatures()
         val clip = withTimeoutOrNull(DECODE_TIMEOUT_MS) { withContext(Dispatchers.IO) { decode(url) } } ?: return null
         val audio = AudioAnalyzer.analyze(clip.samples, clip.sampleRate) ?: return TrackFeatures()

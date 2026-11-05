@@ -111,7 +111,7 @@ class TransferViewModel @Inject constructor(
         viewModelScope.launch {
             val choices = try {
                 listOf(SourceChoice(TrackSource.LikedSongs, "Me gusta")) +
-                    provider.playlists.writablePlaylists().map { SourceChoice(TrackSource.FromPlaylist(it.id), it.name) }
+                    provider.playlists.allPlaylists().map { SourceChoice(TrackSource.FromPlaylist(it.id), it.name) }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {

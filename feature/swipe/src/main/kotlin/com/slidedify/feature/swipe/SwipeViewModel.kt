@@ -13,6 +13,7 @@ import com.slidedify.core.domain.repository.TrackSource
 import com.slidedify.core.domain.repository.key
 import com.slidedify.core.domain.session.Decision
 import com.slidedify.core.domain.session.HistoryEntry
+import com.slidedify.core.domain.session.LibraryEffect
 import com.slidedify.core.domain.session.SessionUpdate
 import com.slidedify.core.domain.session.SortSession
 import com.slidedify.core.domain.settings.RecentSource
@@ -86,6 +87,8 @@ data class SwipeUiState(
     val sortedIds: Set<TrackId> = emptySet(),
     /** Where this song probably goes, when one destination clearly fits best. */
     val suggestion: SlotSuggestion? = null,
+    /** Sorting moves songs out of the source playlist instead of copying them. */
+    val movesFromSource: Boolean = false,
     /** Order of [queue], chosen in the song list. */
     val queueOrder: TrackOrder = TrackOrder.Source,
     val queueDescending: Boolean = false,
@@ -163,6 +166,12 @@ class SwipeViewModel @Inject constructor(
     /** Whether the user left playback on; false at start (the app opens paused). */
     private var keepPlaying = false
     private var alreadySorted: Set<TrackId> = emptySet()
+
+    /** The source is one of the user's own playlists, so songs can be moved out of it. */
+    private var sourceWritable = false
+
+    /** Songs taken out of the source playlist in this session (undo puts them back). */
+    private val movedOut = mutableSetOf<TrackId>()
     private val settings: StateFlow<SortSettings> =
         settingsRepository.settings.stateIn(viewModelScope, SharingStarted.Eagerly, SortSettings())
 
@@ -212,6 +221,7 @@ class SwipeViewModel @Inject constructor(
                 isLoadingMore = load.loadingMore,
                 queueOrder = order.first,
                 queueDescending = order.second,
+                movesFromSource = sourceWritable && settings.moveFromSource,
             )
             if (session == null) return@combine base.copy(isLoading = load.error == null, loadError = load.error)
             val current = session.current
@@ -324,6 +334,12 @@ class SwipeViewModel @Inject constructor(
         return reordered(trackComparator(order, descending) { loadIndex[it.id] ?: Int.MAX_VALUE })
     }
 
+    /** Before handing the song to the service's own app (full song): stop the preview. */
+    fun onOpenExternally() {
+        keepPlaying = false
+        viewModelScope.launch { player.pause() }
+    }
+
     /** Accepts the suggested destination, like swiping to it. */
     fun onAcceptSuggestion() {
         val suggestion = uiState.value.suggestion ?: return
@@ -341,10 +357,11 @@ class SwipeViewModel @Inject constructor(
         session.value = null
         loadJob = viewModelScope.launch {
             try {
-                val all = provider.playlists.writablePlaylists()
+                val all = provider.playlists.allPlaylists()
                 val sourcePlaylist = (source as? TrackSource.FromPlaylist)?.let { s -> all.firstOrNull { it.id == s.id } }
-                // When sorting a playlist, it cannot also be a destination for its own tracks.
-                playlists.value = all.filterNot { it.id == sourcePlaylist?.id }
+                sourceWritable = sourcePlaylist?.canWrite == true
+                // Only editable playlists are destinations, and never the source itself.
+                playlists.value = all.filter { it.canWrite && it.id != sourcePlaylist?.id }
                 rememberAsRecent(sourcePlaylist?.imageUrl, total = sourcePlaylist?.trackCount)
                 alreadySorted = progress.sortedTracks(provider.id, source.key)
                 loadIndex.clear()
@@ -490,8 +507,14 @@ class SwipeViewModel @Inject constructor(
         val current = session.value ?: return
         if (!current.canUndo) return
         val before = current.current
-        (current.history.lastOrNull() as? HistoryEntry.Decided)?.takeUnless { it.wasSorted }?.let { undone ->
+        val last = current.history.lastOrNull() as? HistoryEntry.Decided
+        last?.takeUnless { it.wasSorted }?.let { undone ->
             viewModelScope.launch { progress.unmarkSorted(provider.id, source.key, undone.track.id) }
+        }
+        // A moved song goes back into the source playlist (at the end: services don't keep the old spot).
+        val from = source as? TrackSource.FromPlaylist
+        if (last != null && from != null && movedOut.remove(last.track.id)) {
+            viewModelScope.launch { libraryRepository.apply(LibraryEffect.AddToPlaylists(last.track, setOf(from.id))) }
         }
         apply(current.undo())
         _events.trySend(SwipeEvent.Undone)
@@ -524,6 +547,12 @@ class SwipeViewModel @Inject constructor(
         if (ids.isEmpty()) return
         val track = session.value?.current
         decide(Decision.AddTo(ids))
+        // "Mover": the song leaves the playlist being sorted.
+        val from = source as? TrackSource.FromPlaylist
+        if (track != null && from != null && sourceWritable && settings.value.moveFromSource) {
+            movedOut += track.id
+            viewModelScope.launch { libraryRepository.apply(LibraryEffect.RemoveFromPlaylists(track, setOf(from.id))) }
+        }
         // Each decision teaches the playlists what they are about.
         if (track != null) {
             val features = trackFeatures.value[track.id]

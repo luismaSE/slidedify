@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 11 and older. Settings, progress and cached song analysis are backed up; login
+     tokens are not (they are encrypted with a key that never leaves this phone). -->
+<full-backup-content>
+    <include domain="file" path="datastore/settings.preferences_pb" />
+    <include domain="database" path="slidedify.db" />
+    <include domain="database" path="slidedify.db-wal" />
+    <include domain="database" path="slidedify.db-shm" />
+</full-backup-content>

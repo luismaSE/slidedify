@@ -1,5 +1,7 @@
 package com.slidedify.feature.swipe
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.VectorConverter
@@ -123,6 +125,7 @@ data class SwipeActions(
     val onAcceptSuggestion: () -> Unit = {},
     val onSendTo: (Set<PlaylistId>) -> Unit = {},
     val onQueueOrder: (TrackOrder, Boolean) -> Unit = { _, _ -> },
+    val onOpenExternally: () -> Unit = {},
 )
 
 @Composable
@@ -169,6 +172,7 @@ fun SwipeRoute(onBack: () -> Unit, onOpenSettings: () -> Unit, viewModel: SwipeV
             onAcceptSuggestion = viewModel::onAcceptSuggestion,
             onSendTo = viewModel::onSendTo,
             onQueueOrder = viewModel::setQueueOrder,
+            onOpenExternally = viewModel::onOpenExternally,
         ),
     )
 }
@@ -291,7 +295,7 @@ private fun TopBar(state: SwipeUiState, actions: SwipeActions) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 val progress = if (state.total > 0) " · ${state.sortedCount} de ${state.total}${if (state.isLoadingMore) "+" else ""}" else ""
                 Text(
-                    state.providerName + progress,
+                    state.providerName + progress + if (state.movesFromSource) " · moviendo" else "",
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.semantics { contentDescription = "${state.sortedCount} de ${state.total} canciones revisadas" },
@@ -305,6 +309,16 @@ private fun TopBar(state: SwipeUiState, actions: SwipeActions) {
                     )
                     Text(" ${state.pendingSync}", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
+            }
+        }
+        // Full song in the service's own app (also the link back its terms ask for).
+        state.current?.externalUrl?.let { url ->
+            val context = LocalContext.current
+            IconButton(onClick = {
+                actions.onOpenExternally()
+                runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
+            }) {
+                Icon(AppIcons.OpenExternal, contentDescription = "Escuchar completa en ${state.providerName}")
             }
         }
         IconButton(onClick = actions.onOpenList, enabled = state.total > 0) { Icon(AppIcons.Queue, contentDescription = "Lista de canciones") }

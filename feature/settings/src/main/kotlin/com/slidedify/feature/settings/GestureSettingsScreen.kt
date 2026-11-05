@@ -74,6 +74,7 @@ import com.slidedify.core.designsystem.color
 import com.slidedify.core.domain.gesture.SectorLayout
 import com.slidedify.core.domain.provider.MusicProvider
 import com.slidedify.core.domain.provider.ProviderRegistry
+import com.slidedify.core.domain.settings.AudioAnalysis
 import com.slidedify.core.domain.settings.ButtonMode
 import com.slidedify.core.domain.settings.SettingsRepository
 import com.slidedify.core.domain.settings.SortSettings
@@ -159,6 +160,10 @@ class GestureSettingsViewModel @Inject constructor(
 
     fun setSuggestions(value: Boolean) = update { it.copy(suggestions = value) }
 
+    fun setMoveFromSource(value: Boolean) = update { it.copy(moveFromSource = value) }
+
+    fun setAudioAnalysis(value: AudioAnalysis) = update { it.copy(audioAnalysis = value) }
+
     fun setHoldTimeout(ms: Long) = update { it.withHoldTimeout(ms) }
 
     fun setButtonMode(mode: ButtonMode) = update { it.copy(buttonMode = mode) }
@@ -188,6 +193,8 @@ fun SettingsRoute(
         onLeftHanded = viewModel::setLeftHanded,
         onHaptics = viewModel::setHaptics,
         onSuggestions = viewModel::setSuggestions,
+        onMoveFromSource = viewModel::setMoveFromSource,
+        onAudioAnalysis = viewModel::setAudioAnalysis,
         onHoldTimeout = viewModel::setHoldTimeout,
         onButtonMode = viewModel::setButtonMode,
         onReplayTutorial = viewModel::replayTutorial,
@@ -204,6 +211,8 @@ fun SettingsScreen(
     onLeftHanded: (Boolean) -> Unit,
     onHaptics: (Boolean) -> Unit,
     onSuggestions: (Boolean) -> Unit,
+    onMoveFromSource: (Boolean) -> Unit,
+    onAudioAnalysis: (AudioAnalysis) -> Unit,
     onHoldTimeout: (Long) -> Unit,
     onButtonMode: (ButtonMode) -> Unit,
     onReplayTutorial: () -> Unit,
@@ -231,13 +240,39 @@ fun SettingsScreen(
             item { DestinationsCard(state, onOpenDestinations) }
 
             item {
-                SettingsGroup("Sugerencias") {
+                SettingsGroup("Ordenar") {
                     SwitchRow(
                         AppIcons.Sparkle,
                         "Sugerir playlist",
                         "Según el estilo de cada canción y de tus playlists",
                         settings.suggestions,
                         onSuggestions,
+                    )
+                    if (settings.suggestions) {
+                        GroupDivider()
+                        ChoiceRow(
+                            icon = AppIcons.Vibration,
+                            title = "Escuchar las canciones",
+                            subtitle = "Analiza la vista previa (unos 0,5 MB por canción) para medir su energía",
+                            options = AudioAnalysis.entries,
+                            selected = settings.audioAnalysis,
+                            label = {
+                                when (it) {
+                                    AudioAnalysis.WifiOnly -> "Solo Wi-Fi"
+                                    AudioAnalysis.Always -> "Siempre"
+                                    AudioAnalysis.Off -> "Nunca"
+                                }
+                            },
+                            onSelect = onAudioAnalysis,
+                        )
+                    }
+                    GroupDivider()
+                    SwitchRow(
+                        AppIcons.Swap,
+                        "Mover en vez de copiar",
+                        "Al ordenar una playlist tuya, la canción sale de ella cuando la mandás a otra",
+                        settings.moveFromSource,
+                        onMoveFromSource,
                     )
                 }
             }
@@ -697,6 +732,42 @@ private fun SwitchRow(icon: ImageVector, title: String, subtitle: String, checke
             Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Switch(checked = checked, onCheckedChange = null)
+    }
+}
+
+/** A setting with a few exclusive options, as a segmented control under its title. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun <T> ChoiceRow(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    options: List<T>,
+    selected: T,
+    label: (T) -> String,
+    onSelect: (T) -> Unit,
+) {
+    Column(Modifier.padding(16.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            RowIcon(icon)
+            Column(Modifier.padding(start = 16.dp)) {
+                Text(title, style = MaterialTheme.typography.bodyLarge)
+                Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        SingleChoiceSegmentedButtonRow(
+            Modifier
+                .fillMaxWidth()
+                .padding(top = 12.dp),
+        ) {
+            options.forEachIndexed { index, option ->
+                SegmentedButton(
+                    selected = selected == option,
+                    onClick = { onSelect(option) },
+                    shape = SegmentedButtonDefaults.itemShape(index, options.size),
+                ) { Text(label(option), maxLines = 1) }
+            }
+        }
     }
 }
 

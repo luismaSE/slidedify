@@ -106,5 +106,9 @@ object AppIcons {
         "M14 10H2v2h12v-2zm0-4H2v2h12V6zM2 16h8v-2H2v2zm19.5-4.5L23 13l-6.99 7-4.51-4.5L13 14l3.01 3 5.49-5.5z",
     )
     val Sort = icon("Sort", "M3 18h6v-2H3v2zM3 6v2h18V6H3zm0 7h12v-2H3v2z")
+    val OpenExternal = icon(
+        "OpenExternal",
+        "M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z",
+    )
     val Chevron = icon("Chevron", "M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z")
 }
