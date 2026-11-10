@@ -3,6 +3,7 @@ name: CI
 on:
   push:
     branches: [main, "claude/**"]
+    tags: ["v*"] # v1.2.3 publishes a GitHub Release (job "release" below)
   pull_request:
 
 concurrency:
@@ -94,7 +95,7 @@ jobs:
 
       # Stable download link for testing on a phone: always the latest build of this branch.
       - name: Publish debug APK (pre-release "debug-latest")
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/')
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -153,3 +154,27 @@ jobs:
             smoke-*.png
           if-no-files-found: ignore
 
+  # A version tag (git tag v0.2.0 && git push origin v0.2.0) publishes a GitHub Release with the
+  # signed APK and the Play Store bundle, only after the build and the emulator checks passed.
+  release:
+    needs: [build, smoke]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v5
+        with:
+          name: compass-release
+          path: out
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          cp out/apk/release/app-release.apk "compass-$version.apk"
+          cp out/bundle/release/app-release.aab "compass-$version.aab"
+          gh release create "$GITHUB_REF_NAME" "compass-$version.apk" "compass-$version.aab" \
+            --title "Compass $version" \
+            --generate-notes \
+            --verify-tag
