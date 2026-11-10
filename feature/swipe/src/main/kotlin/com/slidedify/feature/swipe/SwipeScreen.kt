@@ -631,6 +631,15 @@ private fun TrackCard(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
+                // Attribution for the service's data (its terms ask for it); the full song opens from the top bar.
+                if (track.externalUrl != null) {
+                    Text(
+                        stringResource(R.string.swipe_data_from, state.providerName),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
+                        modifier = Modifier.padding(top = 2.dp),
+                    )
+                }
             }
             if (state.canLike) {
                 Icon(

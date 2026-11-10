@@ -110,4 +110,5 @@
     <string name="reason_style">Estilo parecido: %1$s</string>
     <string name="reason_name">Encaja con el nombre «%1$s»</string>
     <string name="reason_tempo">Ritmo parecido (~%1$d BPM)</string>
+    <string name="swipe_data_from">Datos de %1$s</string>
 </resources>

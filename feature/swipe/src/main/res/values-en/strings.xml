@@ -110,4 +110,5 @@
     <string name="reason_style">Similar style: %1$s</string>
     <string name="reason_name">Fits the name «%1$s»</string>
     <string name="reason_tempo">Similar tempo (~%1$d BPM)</string>
+    <string name="swipe_data_from">Data from %1$s</string>
 </resources>
