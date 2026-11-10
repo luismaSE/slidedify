@@ -186,6 +186,8 @@ class GestureSettingsViewModel @Inject constructor(
 fun SettingsRoute(
     onOpenDestinations: () -> Unit,
     onOpenConnections: () -> Unit,
+    onOpenPrivacy: () -> Unit = {},
+    onOpenLicenses: () -> Unit = {},
     onBack: (() -> Unit)? = null,
     viewModel: GestureSettingsViewModel = hiltViewModel(),
 ) {
@@ -195,6 +197,8 @@ fun SettingsRoute(
         onBack = onBack,
         onOpenDestinations = onOpenDestinations,
         onOpenConnections = onOpenConnections,
+        onOpenPrivacy = onOpenPrivacy,
+        onOpenLicenses = onOpenLicenses,
         onLeftHanded = viewModel::setLeftHanded,
         onHaptics = viewModel::setHaptics,
         onSuggestions = viewModel::setSuggestions,
@@ -214,6 +218,8 @@ fun SettingsScreen(
     onBack: (() -> Unit)?,
     onOpenDestinations: () -> Unit,
     onOpenConnections: () -> Unit,
+    onOpenPrivacy: () -> Unit,
+    onOpenLicenses: () -> Unit,
     onLeftHanded: (Boolean) -> Unit,
     onHaptics: (Boolean) -> Unit,
     onSuggestions: (Boolean) -> Unit,
@@ -405,6 +411,14 @@ fun SettingsScreen(
                         stringResource(R.string.settings_active_service, state.providerName),
                         onOpenConnections,
                     )
+                }
+            }
+
+            item {
+                SettingsGroup(stringResource(R.string.settings_group_about)) {
+                    NavRow(AppIcons.Info, stringResource(R.string.about_privacy), stringResource(R.string.about_privacy_detail), onOpenPrivacy)
+                    GroupDivider()
+                    NavRow(AppIcons.Library, stringResource(R.string.about_licenses), stringResource(R.string.about_licenses_detail), onOpenLicenses)
                 }
             }
 

@@ -1,0 +1,36 @@
+In short: Compass has no servers of its own. It doesn't collect, sell or share your data.
+Everything the app stores stays on your phone.
+
+Your music account. You sign in with each service's official login (Spotify, TIDAL, YouTube).
+Compass receives an access permission that is stored encrypted on your phone and never sent to
+anyone else. With it the app reads your playlists, liked songs and their tracks, and makes the
+changes you ask for (adding or removing songs, creating playlists, liking songs) directly in the
+service.
+
+What is stored on the phone. Your settings, the progress of each list, recent lists, changes
+waiting to be sent and the analysis of songs (style and energy). Android backup may save this data
+to your Google account; the access permission to your music account is excluded.
+
+External services the app contacts, directly from your phone:
+- The music service you connected, to read and change your library.
+- Deezer, with a song's title, artist or ISRC code, to get the 30-second preview, tempo and
+  loudness.
+- Last.fm, with a song's title and artist, to get style tags.
+
+Only song information is sent to them, never your account data. As with any internet connection,
+they see your phone's IP address. Each has its own privacy policy.
+
+Audio. Previews are analysed on the phone to measure their energy. Nothing is uploaded.
+
+No ads or tracking. Compass uses no advertising, analytics or trackers.
+
+Error reports. If the app crashes, the error is saved on the phone. It only leaves it if you
+choose to copy or send it.
+
+Deleting your data. Disconnect the service in Connections, clear the app's data or uninstall
+it. You can revoke access in your service account settings (on Spotify: Account → Apps).
+
+Children. Compass is not directed at children under 13.
+
+Changes and contact. If this policy changes, this document is updated. Questions:
+https://github.com/luismaSE/slidedify/issues

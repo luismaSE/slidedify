@@ -63,4 +63,11 @@
     <string name="destinations_done">Listo</string>
     <string name="destinations_done_count">Listo (%1$d)</string>
     <string name="destinations_search">Buscar playlist</string>
+    <string name="about_privacy">Privacidad</string>
+    <string name="about_privacy_detail">Qué datos usa la app y cuáles quedan en el teléfono</string>
+    <string name="about_licenses">Licencias de código abierto</string>
+    <string name="about_licenses_detail">Compass y las librerías que usa</string>
+    <string name="about_compass_license">© 2026 luismaSE · Apache 2.0 · tocá para leerla</string>
+    <string name="about_third_party">Librerías de terceros</string>
+    <string name="settings_group_about">Acerca de</string>
 </resources>

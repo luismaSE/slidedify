@@ -1,0 +1,39 @@
+Resumen: Compass no tiene servidores propios. No recopila, vende ni comparte tus datos. Todo
+lo que la app guarda queda en tu teléfono.
+
+Tu cuenta de música. Iniciás sesión con el login oficial de cada servicio (Spotify, TIDAL,
+YouTube). Compass recibe un permiso de acceso que se guarda cifrado en tu teléfono y nunca se
+envía a nadie más. Con ese permiso la app lee tus playlists, tus "Me gusta" y sus canciones, y hace
+los cambios que vos pedís (agregar o quitar canciones, crear playlists, marcar "Me gusta")
+directamente en el servicio.
+
+Qué queda guardado en el teléfono. Tus ajustes, el progreso de cada lista, las listas recientes,
+los cambios pendientes de enviar y el análisis de las canciones (estilo y energía). La copia de
+seguridad de Android puede guardar esos datos en tu cuenta de Google; el permiso de acceso a tu
+cuenta de música queda excluido.
+
+Servicios externos que consulta la app, directamente desde tu teléfono:
+- El servicio de música que conectaste, para leer y modificar tu biblioteca.
+- Deezer, con el título, el artista o el código ISRC de una canción, para obtener la vista
+  previa de 30 segundos, el tempo y el volumen.
+- Last.fm, con el título y el artista de una canción, para obtener etiquetas de estilo.
+
+A estos servicios se les envía solo información de la canción, nunca datos de tu cuenta. Como en
+cualquier conexión a internet, ven la dirección IP de tu teléfono. Cada uno tiene su propia
+política de privacidad.
+
+Audio. Las vistas previas se analizan en el teléfono para medir su energía. No se sube nada.
+
+Sin publicidad ni seguimiento. Compass no usa publicidad, analíticas ni rastreadores.
+
+Informes de errores. Si la app se cierra, el error queda guardado en el teléfono. Solo sale de
+ahí si vos elegís copiarlo o enviarlo.
+
+Borrar tus datos. Desconectá el servicio en Conexiones, borrá los datos de la app o
+desinstalala. Podés revocar el acceso desde la configuración de tu cuenta del servicio (en Spotify:
+Cuenta → Apps).
+
+Menores. Compass no está dirigida a menores de 13 años.
+
+Cambios y contacto. Si esta política cambia, se actualiza este documento. Consultas:
+https://github.com/luismaSE/slidedify/issues

@@ -47,6 +47,8 @@ import com.slidedify.core.designsystem.AppIcons
 import com.slidedify.core.domain.repository.TrackSource
 import com.slidedify.feature.connections.ConnectionsRoute
 import com.slidedify.feature.settings.DestinationsRoute
+import com.slidedify.feature.settings.LicensesRoute
+import com.slidedify.feature.settings.PrivacyRoute
 import com.slidedify.feature.settings.SettingsRoute
 import com.slidedify.feature.source.HomeRoute
 import com.slidedify.feature.swipe.SwipeRoute
@@ -68,6 +70,12 @@ object SettingsDestination
 
 @Serializable
 object DestinationsDestination
+
+@Serializable
+object PrivacyDestination
+
+@Serializable
+object LicensesDestination
 
 /** Property names must match [com.slidedify.feature.swipe.SwipeArgs]. */
 @Serializable
@@ -164,6 +172,8 @@ fun SlidedifyNavHost() {
                     SettingsRoute(
                         onOpenDestinations = { navController.navigate(DestinationsDestination) },
                         onOpenConnections = { navController.openTab(Tab.Connections) },
+                        onOpenPrivacy = { navController.navigate(PrivacyDestination) },
+                        onOpenLicenses = { navController.navigate(LicensesDestination) },
                     )
                 }
             }
@@ -173,6 +183,8 @@ fun SlidedifyNavHost() {
             ) {
                 Readable { DestinationsRoute(onBack = { navController.popBackStack() }) }
             }
+            composable<PrivacyDestination> { Readable { PrivacyRoute(onBack = { navController.popBackStack() }) } }
+            composable<LicensesDestination> { Readable { LicensesRoute(onBack = { navController.popBackStack() }) } }
             composable<SwipeDestination>(
                 enterTransition = { slideInVertically { it / 6 } + fadeIn() },
                 popExitTransition = { slideOutVertically { it / 6 } + fadeOut() },
