@@ -37,6 +37,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -113,9 +115,14 @@ fun HomeScreen(
     var query by rememberSaveable { mutableStateOf("") }
     val signedIn = state.auth is AuthState.SignedIn
     val lastKey = state.continueCard?.source?.key
+    // A different service (or signing in) is a different home: start it from the top, not wherever
+    // the previous screen was scrolled to.
+    val listState = rememberLazyListState()
+    LaunchedEffect(state.provider?.id, signedIn) { listState.scrollToItem(0) }
 
     LazyColumn(
-        Modifier
+        state = listState,
+        modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background),
         contentPadding = PaddingValues(bottom = 24.dp),
