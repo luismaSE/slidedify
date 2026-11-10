@@ -92,6 +92,7 @@ android {
 
 dependencies {
     implementation(project(":core:domain"))
+    implementation(libs.androidx.work.runtime)
     implementation(project(":core:designsystem"))
     implementation(project(":core:datastore"))
     implementation(project(":core:data"))

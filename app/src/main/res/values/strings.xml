@@ -12,4 +12,11 @@
     <string name="crash_send_with">Enviar el error</string>
     <string name="crash_github">GitHub</string>
     <string name="crash_close">Cerrar</string>
+    <string name="reminder_channel">Nuevos Me gusta</string>
+    <string name="reminder_text">Tocá para ordenarlas en tus playlists.</string>
+    <string name="reminder_source_title">Nuevos Me gusta</string>
+    <plurals name="reminder_title">
+        <item quantity="one">Tenés %1$d canción nueva en Me gusta</item>
+        <item quantity="other">Tenés %1$d canciones nuevas en Me gusta</item>
+    </plurals>
 </resources>

@@ -222,7 +222,7 @@ class YouTubeTrackRepository(private val api: YouTubeApi) : TrackRepository {
     }
 
     override fun pages(source: TrackSource): Flow<List<Track>> = when (source) {
-        TrackSource.LikedSongs -> api.likedPages()
+        TrackSource.LikedSongs, TrackSource.NewLiked -> api.likedPages()
         is TrackSource.FromPlaylist -> api.playlistPages(source.id.value)
         TrackSource.Recommended -> flow { emit(emptyList()) }
     }

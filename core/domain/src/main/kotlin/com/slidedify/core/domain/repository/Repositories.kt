@@ -26,16 +26,29 @@ sealed interface TrackSource {
         override val kind = Kind.Recommended
     }
 
-    enum class Kind { LikedSongs, Playlist, Recommended }
+    /**
+     * Liked songs added since the user last caught up (see NewLikes): a view over [LikedSongs]
+     * that shares its progress. Services serve it as their liked songs.
+     */
+    data object NewLiked : TrackSource {
+        override val kind = Kind.NewLiked
+    }
+
+    enum class Kind { LikedSongs, Playlist, Recommended, NewLiked }
 }
 
-/** Stable key of a source, used to remember sorting progress per source. */
+/** Stable key of a source (recent lists, chosen order). */
 val TrackSource.key: String
     get() = when (this) {
         TrackSource.LikedSongs -> "liked"
+        TrackSource.NewLiked -> "new-liked"
         TrackSource.Recommended -> "recommended"
         is TrackSource.FromPlaylist -> "playlist:${id.value}"
     }
+
+/** Key under which sorting progress is kept: new likes count as progress on liked songs. */
+val TrackSource.progressKey: String
+    get() = if (this == TrackSource.NewLiked) TrackSource.LikedSongs.key else key
 
 /** What to look for when finding a track in another service. */
 data class TrackQuery(

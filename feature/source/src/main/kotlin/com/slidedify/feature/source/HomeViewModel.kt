@@ -25,6 +25,12 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
+import com.slidedify.core.domain.session.NewLikes
+import kotlinx.coroutines.flow.onStart
+import kotlinx.coroutines.flow.mapLatest
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.stateIn
 import javax.inject.Inject
 
@@ -61,6 +67,8 @@ data class HomeUiState(
     /** Liked songs and top tracks. */
     val shortcuts: List<SourceCard> = emptyList(),
     val playlists: List<SourceCard> = emptyList(),
+    /** Liked songs added since the user last caught up ("Nuevos Me gusta"). */
+    val newLikes: Int = 0,
     /** The playlists couldn't be loaded; [errorDetail] is the technical reason, if any. */
     val loadFailed: Boolean = false,
     val errorDetail: String? = null,
@@ -80,8 +88,8 @@ private sealed interface LibraryLoad {
 class HomeViewModel @Inject constructor(
     private val registry: ProviderRegistry,
     private val signIns: Set<@JvmSuppressWildcards ProviderSignIn>,
-    settingsRepository: SettingsRepository,
-    progress: SortProgressRepository,
+    private val settingsRepository: SettingsRepository,
+    private val progress: SortProgressRepository,
 ) : ViewModel() {
     private val refresh = MutableStateFlow(0)
 
@@ -92,7 +100,8 @@ class HomeViewModel @Inject constructor(
                     library(provider, auth),
                     settingsRepository.settings,
                     progress.sortedCounts(provider.id),
-                ) { load, settings, counts -> build(provider, auth, load, settings, counts) }
+                    newLikes(provider, auth),
+                ) { load, settings, counts, newLikes -> build(provider, auth, load, settings, counts).copy(newLikes = newLikes) }
             }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HomeUiState())
@@ -105,6 +114,32 @@ class HomeViewModel @Inject constructor(
 
     fun retry() {
         refresh.value++
+    }
+
+    /** How many liked songs are new since the user last caught up; recounted after each sort. */
+    private fun newLikes(provider: MusicProvider, auth: AuthState): Flow<Int> {
+        if (auth !is AuthState.SignedIn || TrackSource.Kind.LikedSongs !in provider.capabilities.sources) return flowOf(0)
+        return progress.sortedCounts(provider.id)
+            .map { it[TrackSource.LikedSongs.key] ?: 0 }
+            .distinctUntilChanged()
+            .mapLatest {
+                try {
+                    val since = settingsRepository.settings.first().newLikesSince[provider.id] ?: startNewLikes(provider)
+                    NewLikes.load(provider.tracks, progress.sortedTracks(provider.id, TrackSource.LikedSongs.key), since).size
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    0
+                }
+            }
+            .onStart { emit(0) }
+    }
+
+    /** First time: songs liked in the last weeks count as new, older ones don't. */
+    private suspend fun startNewLikes(provider: MusicProvider): Long {
+        val since = System.currentTimeMillis() - NewLikes.FIRST_WINDOW_MS
+        settingsRepository.update { it.copy(newLikesSince = it.newLikesSince + (provider.id to since)) }
+        return since
     }
 
     private fun library(provider: MusicProvider, auth: AuthState): Flow<LibraryLoad> =

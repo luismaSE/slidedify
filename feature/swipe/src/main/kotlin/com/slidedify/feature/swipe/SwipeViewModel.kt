@@ -11,9 +11,11 @@ import com.slidedify.core.domain.repository.LibraryRepository
 import com.slidedify.core.domain.repository.SortProgressRepository
 import com.slidedify.core.domain.repository.TrackSource
 import com.slidedify.core.domain.repository.key
+import com.slidedify.core.domain.repository.progressKey
 import com.slidedify.core.domain.session.Decision
 import com.slidedify.core.domain.session.HistoryEntry
 import com.slidedify.core.domain.session.LibraryEffect
+import com.slidedify.core.domain.session.NewLikes
 import com.slidedify.core.domain.session.SessionUpdate
 import com.slidedify.core.domain.session.SortSession
 import com.slidedify.core.domain.settings.RecentSource
@@ -130,6 +132,7 @@ object SwipeArgs {
         return when (handle.get<String>(KIND)) {
             TrackSource.Kind.Playlist.name -> playlistId?.let { TrackSource.FromPlaylist(PlaylistId(it)) } ?: TrackSource.LikedSongs
             TrackSource.Kind.Recommended.name -> TrackSource.Recommended
+            TrackSource.Kind.NewLiked.name -> TrackSource.NewLiked
             else -> TrackSource.LikedSongs
         }
     }
@@ -364,10 +367,16 @@ class SwipeViewModel @Inject constructor(
                 // Only editable playlists are destinations, and never the source itself.
                 playlists.value = all.filter { it.canWrite && it.id != sourcePlaylist?.id }
                 rememberAsRecent(sourcePlaylist?.imageUrl, total = sourcePlaylist?.trackCount)
-                alreadySorted = progress.sortedTracks(provider.id, source.key)
+                alreadySorted = progress.sortedTracks(provider.id, source.progressKey)
                 loadIndex.clear()
                 decodeOrder(settingsRepository.settings.first().queueOrders[orderKey])?.let { queueOrder.value = it }
-                provider.tracks.pages(source).collect { page -> onPage(page) }
+                if (source == TrackSource.NewLiked) {
+                    // Only the songs liked since the user last caught up, in one go.
+                    val since = settingsRepository.settings.first().newLikesSince[provider.id]
+                    onPage(NewLikes.load(provider.tracks, alreadySorted, since))
+                } else {
+                    provider.tracks.pages(source).collect { page -> onPage(page) }
+                }
                 if (session.value == null) onPage(emptyList())
                 loadState.value = loadState.value.copy(loadingMore = false)
                 rememberAsRecent(sourcePlaylist?.imageUrl, total = session.value?.tracks?.size)
@@ -394,7 +403,7 @@ class SwipeViewModel @Inject constructor(
     /** "Empezar de nuevo": forget the progress of this source and reload it. */
     fun restart() {
         viewModelScope.launch {
-            progress.clear(provider.id, source.key)
+            progress.clear(provider.id, source.progressKey)
             load()
         }
     }
@@ -511,7 +520,7 @@ class SwipeViewModel @Inject constructor(
         val before = current.current
         val last = current.history.lastOrNull() as? HistoryEntry.Decided
         last?.takeUnless { it.wasSorted }?.let { undone ->
-            viewModelScope.launch { progress.unmarkSorted(provider.id, source.key, undone.track.id) }
+            viewModelScope.launch { progress.unmarkSorted(provider.id, source.progressKey, undone.track.id) }
         }
         // A moved song goes back into the source playlist (at the end: services don't keep the old spot).
         val from = source as? TrackSource.FromPlaylist
@@ -568,7 +577,7 @@ class SwipeViewModel @Inject constructor(
         val current = session.value ?: return
         val track = current.current ?: return
         apply(current.decide(decision))
-        viewModelScope.launch { progress.markSorted(provider.id, source.key, track.id) }
+        viewModelScope.launch { progress.markSorted(provider.id, source.progressKey, track.id) }
         onTrackChanged()
     }
 

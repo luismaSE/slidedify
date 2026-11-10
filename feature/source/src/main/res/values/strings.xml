@@ -60,4 +60,9 @@
         <item quantity="one">hace %1$d día</item>
         <item quantity="other">hace %1$d días</item>
     </plurals>
+    <string name="source_new_liked">Nuevos Me gusta</string>
+    <plurals name="home_new_likes">
+        <item quantity="one">%1$d canción nueva para ordenar</item>
+        <item quantity="other">%1$d canciones nuevas para ordenar</item>
+    </plurals>
 </resources>

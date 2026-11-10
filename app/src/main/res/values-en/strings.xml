@@ -11,4 +11,11 @@
     <string name="crash_send_with">Send the error</string>
     <string name="crash_github">GitHub</string>
     <string name="crash_close">Close</string>
+    <string name="reminder_channel">New liked songs</string>
+    <string name="reminder_text">Tap to sort them into your playlists.</string>
+    <string name="reminder_source_title">New liked songs</string>
+    <plurals name="reminder_title">
+        <item quantity="one">You have %1$d new liked song</item>
+        <item quantity="other">You have %1$d new liked songs</item>
+    </plurals>
 </resources>

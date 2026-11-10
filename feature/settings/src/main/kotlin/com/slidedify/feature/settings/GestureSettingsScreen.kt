@@ -1,5 +1,11 @@
 package com.slidedify.feature.settings
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -165,6 +171,8 @@ class GestureSettingsViewModel @Inject constructor(
 
     fun setMoveFromSource(value: Boolean) = update { it.copy(moveFromSource = value) }
 
+    fun setNewLikesReminder(value: Boolean) = update { it.copy(newLikesReminder = value) }
+
     fun setAudioAnalysis(value: AudioAnalysis) = update { it.copy(audioAnalysis = value) }
 
     fun setTheme(value: ThemeMode) = update { it.copy(theme = value) }
@@ -203,6 +211,7 @@ fun SettingsRoute(
         onHaptics = viewModel::setHaptics,
         onSuggestions = viewModel::setSuggestions,
         onMoveFromSource = viewModel::setMoveFromSource,
+        onNewLikesReminder = viewModel::setNewLikesReminder,
         onAudioAnalysis = viewModel::setAudioAnalysis,
         onTheme = viewModel::setTheme,
         onHoldTimeout = viewModel::setHoldTimeout,
@@ -224,6 +233,7 @@ fun SettingsScreen(
     onHaptics: (Boolean) -> Unit,
     onSuggestions: (Boolean) -> Unit,
     onMoveFromSource: (Boolean) -> Unit,
+    onNewLikesReminder: (Boolean) -> Unit,
     onAudioAnalysis: (AudioAnalysis) -> Unit,
     onTheme: (ThemeMode) -> Unit,
     onHoldTimeout: (Long) -> Unit,
@@ -285,6 +295,8 @@ fun SettingsScreen(
                         settings.moveFromSource,
                         onMoveFromSource,
                     )
+                    GroupDivider()
+                    ReminderRow(settings.newLikesReminder, onNewLikesReminder)
                 }
             }
 
@@ -786,6 +798,25 @@ private fun SwitchRow(icon: ImageVector, title: String, subtitle: String, checke
             Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Switch(checked = checked, onCheckedChange = null)
+    }
+}
+
+/** Weekly "new liked songs" notification; asks for the notification permission when turned on. */
+@Composable
+private fun ReminderRow(enabled: Boolean, onChange: (Boolean) -> Unit) {
+    val context = LocalContext.current
+    val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) onChange(true)
+    }
+    SwitchRow(
+        AppIcons.Sparkle,
+        stringResource(R.string.settings_reminder),
+        stringResource(R.string.settings_reminder_detail),
+        enabled,
+    ) { on ->
+        val needsPermission = on && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        if (needsPermission) permission.launch(Manifest.permission.POST_NOTIFICATIONS) else onChange(on)
     }
 }
 

@@ -70,4 +70,6 @@
     <string name="about_compass_license">© 2026 luismaSE · Apache 2.0 · tocá para leerla</string>
     <string name="about_third_party">Librerías de terceros</string>
     <string name="settings_group_about">Acerca de</string>
+    <string name="settings_reminder">Avisarme de nuevos Me gusta</string>
+    <string name="settings_reminder_detail">Una notificación por semana si hay canciones nuevas para ordenar</string>
 </resources>

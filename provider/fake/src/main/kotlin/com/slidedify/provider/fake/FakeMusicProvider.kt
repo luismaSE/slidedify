@@ -108,7 +108,7 @@ class FakeTrackRepository @Inject constructor() : TrackRepository {
         FakeCatalog.tracks.filter { it.title.contains(query.title, ignoreCase = true) || query.title.contains(it.title, ignoreCase = true) }
 
     override suspend fun tracks(source: TrackSource): List<Track> = when (source) {
-        TrackSource.LikedSongs, TrackSource.Recommended -> FakeCatalog.tracks
+        TrackSource.LikedSongs, TrackSource.NewLiked, TrackSource.Recommended -> FakeCatalog.tracks
         // Each demo playlist gets a stable subset of the catalog.
         is TrackSource.FromPlaylist -> {
             val offset = FakeCatalog.playlists.indexOfFirst { it.id == source.id }.coerceAtLeast(0)

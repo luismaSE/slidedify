@@ -191,13 +191,13 @@ class PlaylistTransfer(
 
     private fun sourceRemoval(source: TrackSource, track: Track): LibraryEffect? = when (source) {
         is TrackSource.FromPlaylist -> LibraryEffect.RemoveFromPlaylists(track, setOf(source.id))
-        TrackSource.LikedSongs -> LibraryEffect.SetLiked(track, false)
+        TrackSource.LikedSongs, TrackSource.NewLiked -> LibraryEffect.SetLiked(track, false)
         TrackSource.Recommended -> null
     }
 
     private fun sourceAddition(source: TrackSource, track: Track): LibraryEffect? = when (source) {
         is TrackSource.FromPlaylist -> LibraryEffect.AddToPlaylists(track, setOf(source.id))
-        TrackSource.LikedSongs -> LibraryEffect.SetLiked(track, true)
+        TrackSource.LikedSongs, TrackSource.NewLiked -> LibraryEffect.SetLiked(track, true)
         TrackSource.Recommended -> null
     }
 }

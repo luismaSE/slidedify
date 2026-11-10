@@ -48,6 +48,8 @@ internal data class StoredSettings(
     val recent: List<StoredRecent> = emptyList(),
     val lastProvider: String? = null,
     val queueOrders: Map<String, String> = emptyMap(),
+    val newLikesSince: Map<String, Long> = emptyMap(),
+    val newLikesReminder: Boolean = false,
 )
 
 @Serializable
@@ -65,6 +67,7 @@ internal fun StoredRecent.toDomain(): RecentSource? {
     val source = when (kind) {
         TrackSource.Kind.LikedSongs.name -> TrackSource.LikedSongs
         TrackSource.Kind.Recommended.name -> TrackSource.Recommended
+        TrackSource.Kind.NewLiked.name -> TrackSource.NewLiked
         TrackSource.Kind.Playlist.name -> playlistId?.let { TrackSource.FromPlaylist(PlaylistId(it)) }
         else -> null
     } ?: return null
@@ -106,6 +109,8 @@ internal object SettingsMapper {
         recent = stored.recent.mapNotNull { it.toDomain() },
         lastProvider = stored.lastProvider?.let(::ProviderId),
         queueOrders = stored.queueOrders,
+        newLikesSince = stored.newLikesSince.mapKeys { ProviderId(it.key) },
+        newLikesReminder = stored.newLikesReminder,
     )
 
     fun toStored(settings: SortSettings) = StoredSettings(
@@ -125,6 +130,8 @@ internal object SettingsMapper {
         recent = settings.recent.map { it.toStored() },
         lastProvider = settings.lastProvider?.value,
         queueOrders = settings.queueOrders,
+        newLikesSince = settings.newLikesSince.mapKeys { it.key.value },
+        newLikesReminder = settings.newLikesReminder,
     )
 
     fun decode(raw: String?): SortSettings = try {

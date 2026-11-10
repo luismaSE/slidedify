@@ -61,7 +61,7 @@ internal fun TrackDto.toDomain(): Track? {
 
 class SpotifyTrackRepository(private val api: SpotifyWebApi) : TrackRepository {
     override suspend fun tracks(source: TrackSource): List<Track> = when (source) {
-        TrackSource.LikedSongs -> api.savedTracks()
+        TrackSource.LikedSongs, TrackSource.NewLiked -> api.savedTracks()
         is TrackSource.FromPlaylist -> api.playlistTracks(source.id.value)
         // /recommendations is gone for new apps; top tracks are the base (see docs §5.2).
         TrackSource.Recommended -> api.topTracks()
@@ -79,7 +79,7 @@ class SpotifyTrackRepository(private val api: SpotifyWebApi) : TrackRepository {
     }
 
     override fun pages(source: TrackSource): Flow<List<Track>> = when (source) {
-        TrackSource.LikedSongs -> api.savedTrackPages()
+        TrackSource.LikedSongs, TrackSource.NewLiked -> api.savedTrackPages()
         is TrackSource.FromPlaylist -> api.playlistTrackPages(source.id.value)
         TrackSource.Recommended -> flow { emit(api.topTracks()) }
     }.map { page -> page.mapNotNull { it.toDomain() } }

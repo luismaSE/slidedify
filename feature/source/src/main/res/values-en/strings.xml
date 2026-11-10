@@ -60,4 +60,9 @@
         <item quantity="one">%1$d day ago</item>
         <item quantity="other">%1$d days ago</item>
     </plurals>
+    <string name="source_new_liked">New liked songs</string>
+    <plurals name="home_new_likes">
+        <item quantity="one">%1$d new song to sort</item>
+        <item quantity="other">%1$d new songs to sort</item>
+    </plurals>
 </resources>

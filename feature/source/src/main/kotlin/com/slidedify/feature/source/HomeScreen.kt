@@ -148,6 +148,13 @@ fun HomeScreen(
             }
         }
 
+        if (state.newLikes > 0) {
+            item(key = "new-likes") {
+                val name = stringResource(R.string.source_new_liked)
+                NewLikesCard(state.newLikes) { onOpenSource(TrackSource.NewLiked, name) }
+            }
+        }
+
         if (state.shortcuts.isNotEmpty()) {
             item(key = "shortcuts-title") { SectionHeader(stringResource(R.string.home_shortcuts)) }
             item(key = "shortcuts") {
@@ -348,6 +355,36 @@ private fun ContinueCard(card: SourceCard, onClick: () -> Unit) {
                     Text(stringResource(if (card.isDone) R.string.home_review_again else R.string.home_continue))
                 }
             }
+        }
+    }
+}
+
+/** Liked songs added since the last time the user caught up: one tap to sort just those. */
+@Composable
+private fun NewLikesCard(count: Int, onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.primaryContainer,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 6.dp),
+    ) {
+        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(AppIcons.Sparkle, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
+            Column(
+                Modifier
+                    .padding(start = 14.dp)
+                    .weight(1f),
+            ) {
+                Text(stringResource(R.string.source_new_liked), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                Text(
+                    pluralStringResource(R.plurals.home_new_likes, count, count),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                )
+            }
+            Icon(AppIcons.Chevron, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
         }
     }
 }
@@ -594,6 +631,7 @@ private fun Step(number: Int, title: String, detail: String) {
 
 private fun TrackSource.icon() = when (this) {
     TrackSource.LikedSongs -> AppIcons.Heart
+    TrackSource.NewLiked -> AppIcons.Sparkle
     TrackSource.Recommended -> AppIcons.Queue
     is TrackSource.FromPlaylist -> null
 }
@@ -602,6 +640,7 @@ private fun TrackSource.icon() = when (this) {
 @Composable
 private fun SourceCard.name(): String = when (source) {
     TrackSource.LikedSongs -> stringResource(R.string.source_liked)
+    TrackSource.NewLiked -> stringResource(R.string.source_new_liked)
     TrackSource.Recommended -> stringResource(R.string.source_top)
     is TrackSource.FromPlaylist -> title
 }

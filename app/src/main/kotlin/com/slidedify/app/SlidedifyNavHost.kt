@@ -30,6 +30,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.annotation.StringRes
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.res.stringResource
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -92,8 +93,13 @@ private enum class Tab(val route: Any, val routeClass: KClass<*>, @StringRes val
 private fun NavDestination?.isTab(tab: Tab) = this?.hierarchy?.any { it.hasRoute(tab.routeClass) } == true
 
 @Composable
-fun SlidedifyNavHost() {
+fun SlidedifyNavHost(openNewLikes: Boolean = false) {
     val navController = rememberNavController()
+    // From the weekly notification: straight to sorting the new liked songs.
+    val newLikesTitle = stringResource(R.string.reminder_source_title)
+    LaunchedEffect(Unit) {
+        if (openNewLikes) navController.navigate(SwipeDestination(TrackSource.Kind.NewLiked.name, null, newLikesTitle))
+    }
     val entry by navController.currentBackStackEntryAsState()
     val destination = entry?.destination
     val showBar = Tab.entries.any { destination.isTab(it) }

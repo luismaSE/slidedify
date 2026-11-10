@@ -34,6 +34,8 @@ class SettingsMapperTest {
             ),
             lastProvider = ProviderId("spotify"),
             queueOrders = mapOf("spotify|liked" to "Added:desc"),
+            newLikesSince = mapOf(ProviderId("spotify") to 123L),
+            newLikesReminder = true,
         )
         assertEquals(settings, SettingsMapper.decode(SettingsMapper.encode(settings)))
     }

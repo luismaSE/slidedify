@@ -44,10 +44,17 @@ import dagger.hilt.android.AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     @Inject lateinit var settingsRepository: SettingsRepository
 
+    companion object {
+        /** Extra telling the app what to open, e.g. from a notification. */
+        const val EXTRA_OPEN = "open"
+        const val OPEN_NEW_LIKES = "new_likes"
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         val lastCrash = CrashReport.read(this)
+        val openNewLikes = intent?.getStringExtra(EXTRA_OPEN) == OPEN_NEW_LIKES
         setContent {
             val themeFlow = remember { settingsRepository.settings.map { it.theme }.distinctUntilChanged() }
             val mode = themeFlow.collectAsState(initial = ThemeMode.Dark).value
@@ -66,7 +73,7 @@ class MainActivity : ComponentActivity() {
                 enableEdgeToEdge(statusBarStyle = style, navigationBarStyle = style)
             }
             SlidedifyTheme(darkTheme = dark) {
-                SlidedifyNavHost()
+                SlidedifyNavHost(openNewLikes = openNewLikes)
                 if (lastCrash != null) LastCrashDialog(lastCrash)
             }
         }

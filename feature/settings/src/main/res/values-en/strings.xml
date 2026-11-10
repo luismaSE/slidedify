@@ -70,4 +70,6 @@
     <string name="about_compass_license">© 2026 luismaSE · Apache 2.0 · tap to read it</string>
     <string name="about_third_party">Third-party libraries</string>
     <string name="settings_group_about">About</string>
+    <string name="settings_reminder">Remind me of new liked songs</string>
+    <string name="settings_reminder_detail">One notification a week when there are new songs to sort</string>
 </resources>

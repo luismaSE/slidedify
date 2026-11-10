@@ -38,6 +38,10 @@ data class SortSettings(
     val recent: List<RecentSource> = emptyList(),
     /** Service the user picked last, restored on the next launch. */
     val lastProvider: ProviderId? = null,
+    /** Per service: liked songs before this time never count as "new" (set the first time). */
+    val newLikesSince: Map<ProviderId, Long> = emptyMap(),
+    /** Weekly notification when there are new liked songs to sort. */
+    val newLikesReminder: Boolean = false,
     /** Order chosen for each source's queue ("provider|sourceKey" to e.g. "Added:desc"). */
     val queueOrders: Map<String, String> = emptyMap(),
 ) {

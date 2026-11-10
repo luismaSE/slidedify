@@ -260,14 +260,14 @@ class TidalApi(
 
 class TidalTrackRepository(private val api: TidalApi) : TrackRepository {
     override suspend fun tracks(source: TrackSource): List<Track> = when (source) {
-        TrackSource.LikedSongs -> api.allTracks(TidalEndpoints.collectionTracks(api.userId()))
+        TrackSource.LikedSongs, TrackSource.NewLiked -> api.allTracks(TidalEndpoints.collectionTracks(api.userId()))
         is TrackSource.FromPlaylist -> api.allTracks(TidalEndpoints.playlistItems(source.id.value))
         TrackSource.Recommended -> emptyList()
     }
 
     override fun pages(source: TrackSource): Flow<List<Track>> = flow {
         when (source) {
-            TrackSource.LikedSongs -> api.trackPages(TidalEndpoints.collectionTracks(api.userId())).collect { emit(it) }
+            TrackSource.LikedSongs, TrackSource.NewLiked -> api.trackPages(TidalEndpoints.collectionTracks(api.userId())).collect { emit(it) }
             is TrackSource.FromPlaylist -> api.trackPages(TidalEndpoints.playlistItems(source.id.value)).collect { emit(it) }
             TrackSource.Recommended -> emit(emptyList())
         }
