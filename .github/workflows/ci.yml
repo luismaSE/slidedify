@@ -53,15 +53,20 @@ jobs:
       - name: Android Lint
         run: ./gradlew lintDebug
 
-      - name: Build debug APK
+      - name: Build debug and release
         env:
+          RELEASE_STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
+          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
           # Optional repository secret; without it the APK only has the Demo provider.
           SPOTIFY_CLIENT_ID: ${{ secrets.SPOTIFY_CLIENT_ID }}
           LASTFM_API_KEY: ${{ secrets.LASTFM_API_KEY }}
           # Optional: turn on TIDAL / YouTube Music (see docs/SERVICIOS.md).
           TIDAL_CLIENT_ID: ${{ secrets.TIDAL_CLIENT_ID }}
           YOUTUBE_ENABLED: ${{ secrets.YOUTUBE_ENABLED }}
-        run: ./gradlew :app:assembleDebug
+        # The release build runs R8 (shrinking/obfuscation): building and launching it here catches
+        # missing keep rules before a user ever sees them.
+        run: ./gradlew :app:assembleDebug :app:assembleRelease :app:bundleRelease
 
       - uses: actions/upload-artifact@v5
         if: always()
@@ -78,6 +83,15 @@ jobs:
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
 
+      - uses: actions/upload-artifact@v5
+        with:
+          name: compass-release
+          path: |
+            app/build/outputs/apk/release/*.apk
+            app/build/outputs/bundle/release/*.aab
+            app/build/outputs/mapping/release/mapping.txt
+          if-no-files-found: error
+
       # Stable download link for testing on a phone: always the latest build of this branch.
       - name: Publish debug APK (pre-release "debug-latest")
         if: github.event_name == 'push'
@@ -85,8 +99,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           cp app/build/outputs/apk/debug/app-debug.apk slidedify-debug.apk
+          cp app/build/outputs/apk/release/app-release.apk compass-release.apk
           gh release delete debug-latest --yes --cleanup-tag || true
-          gh release create debug-latest slidedify-debug.apk \
+          gh release create debug-latest slidedify-debug.apk compass-release.apk \
             --prerelease \
             --target "$GITHUB_SHA" \
             --title "Slidedify debug (última versión)" \
@@ -100,14 +115,19 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        api: [34, 36]
+        # The optimized release on one, the debug build on the other.
+        include:
+          - api: 34
+            variant: release
+          - api: 36
+            variant: debug
     steps:
       - uses: actions/checkout@v5
 
       - uses: actions/download-artifact@v5
         with:
-          name: slidedify-debug-apk
-          path: app/build/outputs/apk/debug
+          name: ${{ matrix.variant == 'release' && 'compass-release' || 'slidedify-debug-apk' }}
+          path: apks
 
       - name: Enable KVM
         run: |
@@ -122,12 +142,12 @@ jobs:
           arch: x86_64
           target: google_apis
           disable-animations: true
-          script: ./ci/smoke.sh
+          script: APK=$(ls apks/*.apk apks/apk/release/*.apk 2>/dev/null | head -1) ./ci/smoke.sh
 
       - uses: actions/upload-artifact@v5
         if: always()
         with:
-          name: smoke-logs-${{ matrix.api }}
+          name: smoke-logs-${{ matrix.api }}-${{ matrix.variant }}
           path: |
             logcat.txt
             smoke-*.png

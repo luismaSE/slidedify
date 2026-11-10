@@ -2,7 +2,8 @@
 # Installs the debug APK on the emulator and walks the main path: welcome screen, try the demo,
 # open a source, swipe a song, visit every tab, then close and reopen. Fails on any crash.
 set -u
-APK=app/build/outputs/apk/debug/app-debug.apk
+APK=${APK:-app/build/outputs/apk/debug/app-debug.apk}
+echo "Testing $APK"
 PKG=com.slidedify.app
 API=$(adb shell getprop ro.build.version.sdk | tr -d '\r')
 
