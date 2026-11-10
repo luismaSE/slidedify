@@ -9,6 +9,9 @@ API=$(adb shell getprop ro.build.version.sdk | tr -d '\r')
 
 fail() {
   echo "::error::(API $API) $1"
+  # What was on screen, to see why an element wasn't found.
+  adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1
+  echo "Visible texts:"; adb exec-out cat /sdcard/ui.xml | tr '>' '\n' | grep -o 'text="[^"]\+"' | head -60
   adb logcat -d > logcat.txt
   grep -A60 "FATAL EXCEPTION" logcat.txt || grep -iE "AndroidRuntime|$PKG" logcat.txt | tail -80
   adb exec-out screencap -p > smoke-screen.png
