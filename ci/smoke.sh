@@ -47,14 +47,15 @@ back_until() {
   return 1
 }
 
-# Like tap_text, but scrolls down (up to 4 times) until the element shows up.
+# Like tap_text, but scrolls down (a few times) until the element shows up.
 tap_scrolling() {
-  for _ in 1 2 3 4 5; do
+  for _ in 1 2 3 4 5 6 7 8; do
     tap_text "$1" && return 0
     SIZE=$(adb shell wm size | grep -oE '[0-9]+x[0-9]+' | tail -1)
     W=${SIZE%x*}; H=${SIZE#*x}
-    adb shell input swipe $((W / 2)) $((H * 3 / 4)) $((W / 2)) $((H / 4)) 300
-    sleep 1
+    # A slow, short drag (no fling), then wait: a tap while the list still moves only stops it.
+    adb shell input swipe $((W / 2)) $((H * 7 / 10)) $((W / 2)) $((H * 4 / 10)) 900
+    sleep 2
   done
   return 1
 }
