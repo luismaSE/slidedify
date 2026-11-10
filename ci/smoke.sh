@@ -97,5 +97,27 @@ adb exec-out screencap -p > smoke-screen.png
 adb shell am force-stop "$PKG"
 adb shell am start -W -n "$PKG/.MainActivity"
 check "relaunch" 12
+
+# --- Second pass: English, light theme and landscape ---------------------------------------
+adb shell cmd locale set-app-locales "$PKG" --locales en-US || true
+adb shell am force-stop "$PKG"
+adb shell am start -W -n "$PKG/.MainActivity"
+check "relaunch in English" 12
+adb exec-out screencap -p > smoke-en-home.png
+tap_text "Settings" || fail "English 'Settings' not on screen"; check "settings in English"
+tap_scrolling "Light" || fail "'Light' theme option not on screen"; check "light theme"
+adb exec-out screencap -p > smoke-en-light-settings.png
+tap_text "Home" || fail "English 'Home' not on screen"; check "home in light theme"
+adb exec-out screencap -p > smoke-en-light-home.png
+
+adb shell settings put system accelerometer_rotation 0
+adb shell settings put system user_rotation 1
+check "landscape" 6
+adb exec-out screencap -p > smoke-landscape-home.png
+tap_scrolling "Liked songs" || fail "'Liked songs' not on screen in landscape"; check "sorting in landscape" 10
+adb exec-out screencap -p > smoke-landscape-sort.png
+adb shell settings put system user_rotation 0
+check "back to portrait" 6
+
 adb logcat -d > logcat.txt
 echo "App works on API $API"
