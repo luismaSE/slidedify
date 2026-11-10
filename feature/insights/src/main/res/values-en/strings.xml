@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="insights_back">Back</string>
+    <string name="insights_retry">Retry</string>
+    <string name="insights_load_failed">Couldn\'t load</string>
+    <string name="insights_load_failed_text">Check your connection and try again.</string>
+    <string name="review_title">Review «%1$s»</string>
+    <string name="review_analysing">Analysing songs… %1$d of %2$d</string>
+    <string name="review_all_fit">Everything fits</string>
+    <string name="review_all_fit_text">Every song matches the style of «%1$s».</string>
+    <plurals name="review_count">
+        <item quantity="one">%1$d song doesn\'t quite fit</item>
+        <item quantity="other">%1$d songs don\'t quite fit</item>
+    </plurals>
+    <string name="review_intro">Compared with the rest of the playlist and with your other playlists. Moving and removing are sent to your service.</string>
+    <string name="review_better_in">Fits better in «%1$s»</string>
+    <string name="review_odd_one">Doesn\'t sound like the rest of the playlist</string>
+    <string name="review_move_to">Move to %1$s</string>
+    <string name="review_remove">Remove</string>
+    <string name="review_keep">Keep</string>
+    <string name="review_moved">Moved to %1$s ✓</string>
+    <string name="review_removed">Removed ✓</string>
+    <string name="review_kept">Stays</string>
+    <string name="ideas_title">Playlist ideas</string>
+    <string name="ideas_analysing">Analysing your liked songs… %1$d of %2$d</string>
+    <string name="ideas_none">No clear groups found</string>
+    <string name="ideas_none_text">It takes at least 8 songs alike in style and energy that don\'t have their own playlist yet.</string>
+    <string name="ideas_intro">Groups of your recent liked songs that sound alike. Rename them if you like and create the playlist.</string>
+    <string name="ideas_name">Name</string>
+    <string name="ideas_create">Create playlist</string>
+    <string name="ideas_created">Created «%1$s» ✓</string>
+    <string name="ideas_create_failed">Couldn\'t create the playlist</string>
+    <string name="ideas_cannot_create">This service doesn\'t allow creating playlists from the app.</string>
+    <plurals name="ideas_songs">
+        <item quantity="one">%1$d song</item>
+        <item quantity="other">%1$d songs</item>
+    </plurals>
+    <string name="ideas_style">%1$s style</string>
+    <string name="band_calm">calm</string>
+    <string name="band_medium">medium energy</string>
+    <string name="band_energetic">energetic</string>
+    <string name="idea_name_calm">Calm %1$s</string>
+    <string name="idea_name_medium">%1$s</string>
+    <string name="idea_name_energetic">Energetic %1$s</string>
+    <string name="idea_name_calm_only">Calm</string>
+    <string name="idea_name_energetic_only">Energetic</string>
+    <plurals name="reason_same_artist">
+        <item quantity="one">You already have one by %2$s here</item>
+        <item quantity="other">You already have %1$d by %2$s here</item>
+    </plurals>
+    <string name="reason_calm">Sounds calm</string>
+    <string name="reason_energetic">Very energetic</string>
+    <string name="reason_similar_energy">Similar energy</string>
+    <string name="reason_mood_name">%1$s, as «%2$s» suggests</string>
+    <string name="reason_mood_playlist">%1$s, like the rest of the playlist</string>
+    <string name="reason_style">Similar style: %1$s</string>
+    <string name="reason_name">Fits the name «%1$s»</string>
+    <string name="reason_tempo">Similar tempo (~%1$d BPM)</string>
+</resources>

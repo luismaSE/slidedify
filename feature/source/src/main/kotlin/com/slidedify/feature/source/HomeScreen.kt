@@ -28,6 +28,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -80,6 +81,8 @@ private const val SEARCH_THRESHOLD = 8
 fun HomeRoute(
     onOpenSource: (TrackSource, String) -> Unit,
     onOpenConnections: () -> Unit,
+    onReviewPlaylist: (playlistId: String, title: String) -> Unit = { _, _ -> },
+    onOpenIdeas: () -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -91,6 +94,8 @@ fun HomeRoute(
         onSignIn = { viewModel.signIn(context) },
         onRetry = viewModel::retry,
         onOpenConnections = onOpenConnections,
+        onReviewPlaylist = onReviewPlaylist,
+        onOpenIdeas = onOpenIdeas,
     )
 }
 
@@ -102,6 +107,8 @@ fun HomeScreen(
     onSignIn: () -> Unit,
     onRetry: () -> Unit,
     onOpenConnections: () -> Unit,
+    onReviewPlaylist: (playlistId: String, title: String) -> Unit = { _, _ -> },
+    onOpenIdeas: () -> Unit = {},
 ) {
     var query by rememberSaveable { mutableStateOf("") }
     val signedIn = state.auth is AuthState.SignedIn
@@ -170,6 +177,10 @@ fun HomeScreen(
             }
         }
 
+        if (state.shortcuts.any { it.source == TrackSource.LikedSongs }) {
+            item(key = "ideas") { IdeasCard(onOpenIdeas) }
+        }
+
         item(key = "playlists-title") {
             SectionHeader(
                 if (state.playlists.isEmpty()) {
@@ -207,7 +218,13 @@ fun HomeScreen(
                 }
             }
             items(visible, key = { it.source.key }) { card ->
-                PlaylistRow(card, isLast = card.source.key == lastKey) { onOpenSource(card.source, card.title) }
+                val playlistId = (card.source as? TrackSource.FromPlaylist)?.id?.value
+                PlaylistRow(
+                    card,
+                    isLast = card.source.key == lastKey,
+                    // Only your own playlists can be cleaned up (moving or removing songs).
+                    onReview = if (playlistId != null && !card.followed) ({ onReviewPlaylist(playlistId, card.title) }) else null,
+                ) { onOpenSource(card.source, card.title) }
             }
         }
     }
@@ -359,6 +376,32 @@ private fun ContinueCard(card: SourceCard, onClick: () -> Unit) {
     }
 }
 
+/** Entry to "Ideas de playlists": new playlists proposed from the style of the liked songs. */
+@Composable
+private fun IdeasCard(onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 16.dp, end = 16.dp, top = 12.dp),
+    ) {
+        Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(AppIcons.Sparkle, contentDescription = null, tint = MaterialTheme.colorScheme.tertiary)
+            Column(
+                Modifier
+                    .padding(start = 12.dp)
+                    .weight(1f),
+            ) {
+                Text(stringResource(R.string.home_ideas), style = MaterialTheme.typography.titleSmall)
+                Text(stringResource(R.string.home_ideas_detail), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Icon(AppIcons.Chevron, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
 /** Liked songs added since the last time the user caught up: one tap to sort just those. */
 @Composable
 private fun NewLikesCard(count: Int, onClick: () -> Unit) {
@@ -435,7 +478,7 @@ private fun ShortcutTile(card: SourceCard, modifier: Modifier = Modifier, onClic
 }
 
 @Composable
-private fun PlaylistRow(card: SourceCard, isLast: Boolean, onClick: () -> Unit) {
+private fun PlaylistRow(card: SourceCard, isLast: Boolean, onReview: (() -> Unit)? = null, onClick: () -> Unit) {
     val container = if (isLast) MaterialTheme.colorScheme.primary.copy(alpha = 0.08f) else Color.Transparent
     Surface(
         onClick = onClick,
@@ -476,6 +519,11 @@ private fun PlaylistRow(card: SourceCard, isLast: Boolean, onClick: () -> Unit) 
                 )
                 card.progress?.takeIf { it > 0f && !card.isDone }?.let {
                     SlimProgress(it, Modifier.fillMaxWidth(0.6f).padding(top = 6.dp))
+                }
+            }
+            if (onReview != null) {
+                IconButton(onClick = onReview) {
+                    Icon(AppIcons.Review, contentDescription = stringResource(R.string.home_review, card.title), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
             if (card.isDone) {

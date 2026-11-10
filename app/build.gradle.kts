@@ -102,6 +102,7 @@ dependencies {
     implementation(project(":core:media"))
     implementation(project(":feature:source"))
     implementation(project(":feature:connections"))
+    implementation(project(":feature:insights"))
     implementation(project(":feature:swipe"))
     implementation(project(":feature:settings"))
     implementation(project(":feature:transfer"))

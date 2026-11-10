@@ -110,5 +110,9 @@ object AppIcons {
         "OpenExternal",
         "M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z",
     )
+    val Review = icon(
+        "Review",
+        "M20 3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM10 17H5v-2h5v2zm0-4H5v-2h5v2zm0-4H5V7h5v2zm4.82 6L12 12.16l1.41-1.41 1.41 1.42L17.99 9l1.42 1.42L14.82 15z",
+    )
     val Chevron = icon("Chevron", "M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z")
 }

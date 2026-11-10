@@ -65,4 +65,7 @@
         <item quantity="one">%1$d canción nueva para ordenar</item>
         <item quantity="other">%1$d canciones nuevas para ordenar</item>
     </plurals>
+    <string name="home_review">Revisar %1$s</string>
+    <string name="home_ideas">Ideas de playlists</string>
+    <string name="home_ideas_detail">Agrupamos tus Me gusta por estilo para armar playlists nuevas</string>
 </resources>

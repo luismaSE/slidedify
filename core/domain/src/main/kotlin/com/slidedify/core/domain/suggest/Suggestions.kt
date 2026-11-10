@@ -21,6 +21,9 @@ data class Stat(val sum: Double = 0.0, val sumSquares: Double = 0.0, val count: 
 
     operator fun plus(value: Float) = Stat(sum + value, sumSquares + value.toDouble() * value, count + 1)
 
+    fun minus(value: Float): Stat =
+        if (count <= 1) Stat() else Stat(sum - value, sumSquares - value.toDouble() * value, count - 1)
+
     companion object {
         const val MIN_SPREAD = 0.12f
         const val DEFAULT_SPREAD = 0.2f
@@ -71,6 +74,27 @@ data class PlaylistProfile(
             energy = features.energy?.let { energy + it } ?: energy,
             bpm = features.bpm?.let { bpm + it } ?: bpm,
         )
+    }
+
+    /** The profile as if [track] weren't in the playlist (to judge that song against the rest). */
+    fun without(track: Track, features: TrackFeatures?): PlaylistProfile {
+        val counts = artists.toMutableMap()
+        track.artists.forEach { artist ->
+            val left = (counts[artist.id] ?: 0) - 1
+            if (left > 0) counts[artist.id] = left else counts.remove(artist.id)
+        }
+        var result = copy(size = (size - 1).coerceAtLeast(0), artists = counts)
+        if (features != null && !features.isEmpty) {
+            val sums = tagSums.toMutableMap()
+            features.tags.forEach { (tag, weight) -> sums[tag] = ((sums[tag] ?: 0f) - weight).coerceAtLeast(0f) }
+            result = result.copy(
+                tagSums = sums.filterValues { it > 0f },
+                tagSamples = (tagSamples - if (features.tags.isEmpty()) 0 else 1).coerceAtLeast(0),
+                energy = features.energy?.let { energy.minus(it) } ?: energy,
+                bpm = features.bpm?.let { bpm.minus(it) } ?: bpm,
+            )
+        }
+        return result
     }
 
     /** Learns from a song the user just sorted into this playlist. */
@@ -128,6 +152,26 @@ object SuggestionEngine {
      */
     fun suggest(track: Track, features: TrackFeatures?, slots: List<List<PlaylistProfile>>): Suggestion? {
         if (slots.isEmpty()) return null
+        val scored = scoreSlots(track, features, slots) ?: return null
+        val ranked = scored.indices.sortedByDescending { scored[it].score }
+        val best = ranked.first()
+        val bestScore = scored[best].score
+        val runnerUp = ranked.getOrNull(1)?.let { scored[it].score } ?: 0f
+        if (bestScore < MIN_SCORE || bestScore - runnerUp < MIN_MARGIN) return null
+        return Suggestion(best, bestScore, slots[best].map { it.playlist }, scored[best].reasons)
+    }
+
+    /** How well [track] fits each playlist, best first; null when nothing is known to compare. */
+    fun rank(track: Track, features: TrackFeatures?, profiles: List<PlaylistProfile>): List<Fit>? {
+        val scored = scoreSlots(track, features, profiles.map { listOf(it) }) ?: return null
+        return profiles.indices.map { Fit(profiles[it].playlist, scored[it].score, scored[it].reasons) }.sortedByDescending { it.score }
+    }
+
+    data class Fit(val playlist: Playlist, val score: Float, val reasons: List<Reason>)
+
+    private data class SlotScore(val score: Float, val reasons: List<Reason>)
+
+    private fun scoreSlots(track: Track, features: TrackFeatures?, slots: List<List<PlaylistProfile>>): List<SlotScore>? {
         val evidence = slots.map { profiles -> profiles.map { evidence(track, features, it) } }
         // A signal counts when some option has evidence for it; the artist one only when some
         // playlist actually has the artist (otherwise it would lower every score alike).
@@ -141,18 +185,14 @@ object SuggestionEngine {
             active.sumOf { ((signals[it]?.value ?: UNKNOWN) * it.weight).toDouble() }.toFloat() / totalWeight
 
         // A combo slot must suit every playlist in it, so it takes the average.
-        val scores = evidence.map { slot -> if (slot.isEmpty()) 0f else slot.map(::scoreOf).average().toFloat() }
-        val ranked = scores.indices.sortedByDescending { scores[it] }
-        val best = ranked.first()
-        val bestScore = scores[best]
-        val runnerUp = ranked.getOrNull(1)?.let { scores[it] } ?: 0f
-        if (bestScore < MIN_SCORE || bestScore - runnerUp < MIN_MARGIN) return null
-
-        val reasons = evidence[best]
-            .flatMap { signals -> active.sortedByDescending { (signals[it]?.value ?: 0f) * it.weight }.mapNotNull { signals[it]?.reason } }
-            .distinct()
-            .take(3)
-        return Suggestion(best, bestScore, slots[best].map { it.playlist }, reasons)
+        return evidence.map { slot ->
+            val score = if (slot.isEmpty()) 0f else slot.map(::scoreOf).average().toFloat()
+            val reasons = slot
+                .flatMap { signals -> active.sortedByDescending { (signals[it]?.value ?: 0f) * it.weight }.mapNotNull { signals[it]?.reason } }
+                .distinct()
+                .take(3)
+            SlotScore(score, reasons)
+        }
     }
 
     private fun evidence(track: Track, features: TrackFeatures?, profile: PlaylistProfile): Map<Signal, Evidence> = buildMap {

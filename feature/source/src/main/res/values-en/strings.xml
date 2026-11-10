@@ -65,4 +65,7 @@
         <item quantity="one">%1$d new song to sort</item>
         <item quantity="other">%1$d new songs to sort</item>
     </plurals>
+    <string name="home_review">Review %1$s</string>
+    <string name="home_ideas">Playlist ideas</string>
+    <string name="home_ideas_detail">Your liked songs grouped by style, to make new playlists</string>
 </resources>

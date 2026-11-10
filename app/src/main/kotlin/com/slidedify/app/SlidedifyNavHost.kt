@@ -47,6 +47,8 @@ import androidx.navigation.compose.rememberNavController
 import com.slidedify.core.designsystem.AppIcons
 import com.slidedify.core.domain.repository.TrackSource
 import com.slidedify.feature.connections.ConnectionsRoute
+import com.slidedify.feature.insights.IdeasRoute
+import com.slidedify.feature.insights.ReviewRoute
 import com.slidedify.feature.settings.DestinationsRoute
 import com.slidedify.feature.settings.LicensesRoute
 import com.slidedify.feature.settings.PrivacyRoute
@@ -71,6 +73,13 @@ object SettingsDestination
 
 @Serializable
 object DestinationsDestination
+
+/** Property names must match [com.slidedify.feature.insights.ReviewArgs]. */
+@Serializable
+data class ReviewDestination(val playlistId: String, val title: String)
+
+@Serializable
+object IdeasDestination
 
 @Serializable
 object PrivacyDestination
@@ -165,6 +174,8 @@ fun SlidedifyNavHost(openNewLikes: Boolean = false) {
                         navController.navigate(SwipeDestination(source.kind.name, playlistId, title))
                     },
                     onOpenConnections = { navController.openTab(Tab.Connections) },
+                    onReviewPlaylist = { id, title -> navController.navigate(ReviewDestination(id, title)) },
+                    onOpenIdeas = { navController.navigate(IdeasDestination) },
                 ) }
             }
             composable<TransferDestination> {
@@ -189,6 +200,8 @@ fun SlidedifyNavHost(openNewLikes: Boolean = false) {
             ) {
                 Readable { DestinationsRoute(onBack = { navController.popBackStack() }) }
             }
+            composable<ReviewDestination> { Readable { ReviewRoute(onBack = { navController.popBackStack() }) } }
+            composable<IdeasDestination> { Readable { IdeasRoute(onBack = { navController.popBackStack() }) } }
             composable<PrivacyDestination> { Readable { PrivacyRoute(onBack = { navController.popBackStack() }) } }
             composable<LicensesDestination> { Readable { LicensesRoute(onBack = { navController.popBackStack() }) } }
             composable<SwipeDestination>(

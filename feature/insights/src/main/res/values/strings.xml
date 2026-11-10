@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="insights_back">Volver</string>
+    <string name="insights_retry">Reintentar</string>
+    <string name="insights_load_failed">No se pudo cargar</string>
+    <string name="insights_load_failed_text">Revisá la conexión y probá de nuevo.</string>
+    <string name="review_title">Revisar «%1$s»</string>
+    <string name="review_analysing">Analizando canciones… %1$d de %2$d</string>
+    <string name="review_all_fit">Todo encaja</string>
+    <string name="review_all_fit_text">Todas las canciones van con el estilo de «%1$s».</string>
+    <plurals name="review_count">
+        <item quantity="one">%1$d canción no encaja del todo</item>
+        <item quantity="other">%1$d canciones no encajan del todo</item>
+    </plurals>
+    <string name="review_intro">Comparadas con el resto de la playlist y con tus otras playlists. Mover y quitar se envían a tu servicio.</string>
+    <string name="review_better_in">Encaja mejor en «%1$s»</string>
+    <string name="review_odd_one">No se parece al resto de la playlist</string>
+    <string name="review_move_to">Mover a %1$s</string>
+    <string name="review_remove">Quitar</string>
+    <string name="review_keep">Dejar</string>
+    <string name="review_moved">Movida a %1$s ✓</string>
+    <string name="review_removed">Quitada ✓</string>
+    <string name="review_kept">Se queda</string>
+    <string name="ideas_title">Ideas de playlists</string>
+    <string name="ideas_analysing">Analizando tus Me gusta… %1$d de %2$d</string>
+    <string name="ideas_none">No encontramos grupos claros</string>
+    <string name="ideas_none_text">Hacen falta al menos 8 canciones parecidas en estilo y energía que no tengan ya su playlist.</string>
+    <string name="ideas_intro">Grupos de tus Me gusta recientes que suenan parecido. Cambiá el nombre si querés y creá la playlist.</string>
+    <string name="ideas_name">Nombre</string>
+    <string name="ideas_create">Crear playlist</string>
+    <string name="ideas_created">Creada «%1$s» ✓</string>
+    <string name="ideas_create_failed">No se pudo crear la playlist</string>
+    <string name="ideas_cannot_create">Este servicio no permite crear playlists desde la app.</string>
+    <plurals name="ideas_songs">
+        <item quantity="one">%1$d canción</item>
+        <item quantity="other">%1$d canciones</item>
+    </plurals>
+    <string name="ideas_style">estilo %1$s</string>
+    <string name="band_calm">tranquilas</string>
+    <string name="band_medium">energía media</string>
+    <string name="band_energetic">con energía</string>
+    <string name="idea_name_calm">%1$s tranquilo</string>
+    <string name="idea_name_medium">%1$s</string>
+    <string name="idea_name_energetic">%1$s con energía</string>
+    <string name="idea_name_calm_only">Tranquilas</string>
+    <string name="idea_name_energetic_only">Con energía</string>
+    <plurals name="reason_same_artist">
+        <item quantity="one">Ya tenés una de %2$s acá</item>
+        <item quantity="other">Ya tenés %1$d de %2$s acá</item>
+    </plurals>
+    <string name="reason_calm">Suena tranquila</string>
+    <string name="reason_energetic">Tiene mucha energía</string>
+    <string name="reason_similar_energy">Energía parecida</string>
+    <string name="reason_mood_name">%1$s, como pide «%2$s»</string>
+    <string name="reason_mood_playlist">%1$s, como el resto de la playlist</string>
+    <string name="reason_style">Estilo parecido: %1$s</string>
+    <string name="reason_name">Encaja con el nombre «%1$s»</string>
+    <string name="reason_tempo">Ritmo parecido (~%1$d BPM)</string>
+</resources>
