@@ -144,3 +144,9 @@ pestaña → reabrir), y publica el APK en el pre-release `debug-latest`.
 - [docs/SERVICIOS.md](docs/SERVICIOS.md): activar TIDAL y YouTube Music.
 - [docs/PROPUESTA.md](docs/PROPUESTA.md) y [docs/ANALISIS.md](docs/ANALISIS.md): propuesta
   inicial y análisis intermedio (históricos; este README describe el estado actual).
+
+## Licencia
+
+[Apache 2.0](LICENSE) © 2026 luismaSE. Podés usar, modificar y distribuir el código, también en
+productos propios, manteniendo el aviso de licencia y el archivo [NOTICE](NOTICE). Spotify, TIDAL,
+YouTube, Deezer y Last.fm son marcas de sus dueños; este proyecto no está afiliado a ellos.
